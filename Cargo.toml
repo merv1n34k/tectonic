@@ -54,6 +54,7 @@ members = [
   "crates/xdv",
   "crates/xetex_format",
   "crates/xetex_layout",
+  "crates/texpresso_protocol",
 ]
 
 [lib]
