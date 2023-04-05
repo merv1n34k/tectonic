@@ -238,6 +238,10 @@ int ttstub_output_close(rust_output_handle_t handle);
 
 rust_input_handle_t ttstub_input_open(char const *path, ttbc_file_format format, int is_gz);
 rust_input_handle_t ttstub_input_open_primary(void);
+
+rust_input_handle_t ttstub_input_open_pic_cache(const char *path, char **full_path, float bounds[4], int pdfBoxType, int page);
+int ttstub_input_close_pic_cache(rust_input_handle_t handle, const char *full_path, const float bounds[4], int pdfBoxType, int page);
+
 ssize_t ttstub_get_last_input_abspath(char *buffer, size_t len);
 size_t ttstub_input_get_size(rust_input_handle_t handle);
 time_t ttstub_input_get_mtime(rust_input_handle_t handle);
