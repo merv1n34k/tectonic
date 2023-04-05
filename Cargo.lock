@@ -350,6 +350,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5827cebf4670468b8772dd191856768aedcb1b0278a04f989f7766351917b9dc"
 
 [[package]]
+name = "cpu-time"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e9e393a7668fe1fad3075085b86c781883000b4ede868f43627b34a87c8b7ded"
+dependencies = [
+ "libc",
+ "winapi 0.3.9",
+]
+
+[[package]]
 name = "cpufeatures"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2445,6 +2455,7 @@ dependencies = [
  "tectonic_geturl",
  "tectonic_io_base",
  "tectonic_status_base",
+ "texpresso_protocol",
  "zip",
 ]
 
@@ -2664,6 +2675,14 @@ dependencies = [
  "nom 5.1.2",
  "phf",
  "phf_codegen",
+]
+
+[[package]]
+name = "texpresso_protocol"
+version = "0.1.0"
+dependencies = [
+ "cpu-time",
+ "libc",
 ]
 
 [[package]]
