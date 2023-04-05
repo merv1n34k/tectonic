@@ -226,17 +226,11 @@ find_pic_file (char **path, real_rect *bounds, int pdfBoxType, int page)
     int err = -1;
     rust_input_handle_t handle;
 
-    *path = NULL;
+    handle = ttstub_input_open (name_of_file, TTBC_FILE_FORMAT_PICT, 0);
     bounds->x = bounds->y = bounds->wd = bounds->ht = 0.0;
-    handle = ttstub_input_open_pic_cache (name_of_file, path, &bounds->x, pdfBoxType, page);
 
     if (handle == NULL)
-    {
-        if (*path)
-            return 0;
-        else
-            return 1;
-    }
+        return 1;
 
     if (pdfBoxType != 0) {
         /* if cmd was \XeTeXpdffile, use xpdflib to read it */
@@ -254,7 +248,7 @@ find_pic_file (char **path, real_rect *bounds, int pdfBoxType, int page)
     if (err == 0)
         *path = xstrdup(name_of_file);
 
-    ttstub_input_close_pic_cache (handle, *path, &bounds->x, pdfBoxType, page);
+    ttstub_input_close (handle);
 
     return err;
 }
