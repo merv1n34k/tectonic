@@ -2444,7 +2444,6 @@ dependencies = [
  "tectonic_geturl",
  "tectonic_io_base",
  "tectonic_status_base",
- "texpresso_protocol",
  "zip",
 ]
 
@@ -2557,6 +2556,7 @@ dependencies = [
  "sha2",
  "tectonic_errors",
  "tectonic_status_base",
+ "texpresso_protocol",
  "thiserror",
 ]
 

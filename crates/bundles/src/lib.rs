@@ -26,7 +26,6 @@ pub mod cache;
 pub mod dir;
 pub mod itar;
 pub mod zip;
-pub mod texpresso;
 
 /// A trait for bundles of Tectonic support files.
 ///
