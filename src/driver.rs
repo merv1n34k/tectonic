@@ -36,6 +36,7 @@ use tectonic_io_base::{
     filesystem::{FilesystemIo, FilesystemPrimaryInputIo},
     stdstreams::{BufferedPrimaryIo, GenuineStdoutIo},
     InputHandle, IoProvider, OpenResult, OutputHandle,
+    texpresso::{self, TexpressoIO},
 };
 
 use crate::{
@@ -226,6 +227,9 @@ struct BridgeState {
 
     /// Memory buffering for files written during processing.
     mem: MemoryIo,
+
+    /// Connection to TeXpresso server
+    texpresso: Option<TexpressoIO>,
 
     /// The main filesystem backing for input files in the project.
     filesystem: FilesystemIo,
@@ -441,6 +445,10 @@ macro_rules! bridgestate_ioprovider_try {
 
 macro_rules! bridgestate_ioprovider_cascade {
     ($self:ident, $($inner:tt)+) => {
+        if let Some(ref mut texpresso) = $self.texpresso {
+            bridgestate_ioprovider_try!(texpresso, $($inner)+);
+        }
+
         if let Some(ref mut p) = $self.genuine_stdout {
             bridgestate_ioprovider_try!(p, $($inner)+);
         }
@@ -1117,6 +1125,13 @@ impl ProcessingSessionBuilder {
 
         let mut filesystem_root = self.filesystem_root.unwrap_or_default();
 
+        let texpresso = unsafe {
+            match texpresso::TexpressoIOState::client_from_env() {
+                None => None,
+                Some(client) =>
+                    Some(texpresso::TexpressoIOState::new_texpresso_io(client))
+            }
+        };
         let (pio, primary_input_path, default_output_path) = match self.primary_input {
             PrimaryInputMode::Path(p) => {
                 // Set the filesystem root (that's the directory we'll search
@@ -1191,6 +1206,7 @@ impl ProcessingSessionBuilder {
         let bs = BridgeState {
             primary_input: pio,
             mem,
+            texpresso,
             filesystem,
             extra_search_paths,
             shell_escape_work: None,
