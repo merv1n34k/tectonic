@@ -67,7 +67,7 @@ impl Client {
     fn send_tag(&mut self, tag: [u8; 4]) -> () {
         self.send4(tag);
         let time = self.delta + ProcessTime::elapsed(&self.start_time);
-        self.send4((time.as_millis() as u32).to_be_bytes());
+        self.send4((time.as_millis() as u32).to_le_bytes());
     }
 
     fn recv4(&mut self) -> [u8; 4] {
@@ -85,8 +85,9 @@ impl Client {
     }
 
     pub fn open(&mut self, file: FileId, path: &str, mode: &str) -> bool {
+        eprintln!("open({file}, {path}, {mode})");
         self.send_tag(*b"OPEN");
-        self.send4(file.to_be_bytes());
+        self.send4(file.to_le_bytes());
         self.send_str(path);
         self.send_str(mode);
         match &self.recv4() {
@@ -98,14 +99,14 @@ impl Client {
 
     pub fn read(&mut self, file: FileId, pos: u32, buf: &mut [u8]) -> Option<usize> {
         self.send_tag(*b"READ");
-        self.send4(file.to_be_bytes());
-        self.send4(pos.to_be_bytes());
-        self.send4((buf.len() as u32).to_be_bytes());
+        self.send4(file.to_le_bytes());
+        self.send4(pos.to_le_bytes());
+        self.send4((buf.len() as u32).to_le_bytes());
 
         match &self.recv4() {
             b"FORK" => return None,
             b"READ" => {
-                let rd_size = u32::from_be_bytes(self.recv4()) as usize;
+                let rd_size = u32::from_le_bytes(self.recv4()) as usize;
                 if rd_size > buf.len() {
                     panic!()
                 };
@@ -118,45 +119,45 @@ impl Client {
 
     pub fn write(&mut self, file: FileId, pos: u32, buf: &[u8]) -> () {
         self.send_tag(*b"WRIT");
-        self.send4(file.to_be_bytes());
-        self.send4(pos.to_be_bytes());
-        self.send4((buf.len() as u32).to_be_bytes());
+        self.send4(file.to_le_bytes());
+        self.send4(pos.to_le_bytes());
+        self.send4((buf.len() as u32).to_le_bytes());
         self.file.write_all(buf).unwrap();
         self.check_done();
     }
 
     pub fn close(&mut self, file: FileId) -> () {
         self.send_tag(*b"CLOS");
-        self.send4(file.to_be_bytes());
+        self.send4(file.to_le_bytes());
         self.check_done();
     }
 
     pub fn size(&mut self, file: FileId) -> u32 {
         self.send_tag(*b"SIZE");
-        self.send4(file.to_be_bytes());
+        self.send4(file.to_le_bytes());
         match &self.recv4() {
-            b"SIZE" => return u32::from_be_bytes(self.recv4()),
+            b"SIZE" => return u32::from_le_bytes(self.recv4()),
             _ => panic!(),
         }
     }
 
     pub fn seen(&mut self, file: FileId, pos: u32) {
         self.send_tag(*b"SEEN");
-        self.send4(file.to_be_bytes());
-        self.send4(pos.to_be_bytes());
+        self.send4(file.to_le_bytes());
+        self.send4(pos.to_le_bytes());
     }
 
     pub fn child(&mut self, id: ClientId) {
         self.send_tag(*b"CHLD");
-        self.send4(id.to_be_bytes());
+        self.send4(id.to_le_bytes());
         self.check_done();
     }
 
     pub fn back(&mut self, id: ClientId, child: ClientId, exitcode: u32) -> bool {
         self.send_tag(*b"BACK");
-        self.send4(id.to_be_bytes());
-        self.send4(child.to_be_bytes());
-        self.send4(exitcode.to_be_bytes());
+        self.send4(id.to_le_bytes());
+        self.send4(child.to_le_bytes());
+        self.send4(exitcode.to_le_bytes());
         match &self.recv4() {
             b"DONE" => return true,
             b"PASS" => return false,
@@ -178,10 +179,10 @@ impl Client {
 
         self.send_tag(*b"ACCS");
         self.send_str(path);
-        self.send4(mode.to_be_bytes());
+        self.send4(mode.to_le_bytes());
 
         match &self.recv4() {
-            b"ACCS" => match u32::from_be_bytes(self.recv4()) {
+            b"ACCS" => match u32::from_le_bytes(self.recv4()) {
                 0 => return AccessResult::Pass,
                 1 => return AccessResult::Ok,
                 2 => return AccessResult::ENoEnt,
@@ -201,25 +202,25 @@ impl Client {
             _ => panic!(),
         };
 
-        match u32::from_be_bytes(self.recv4()) {
+        match u32::from_le_bytes(self.recv4()) {
             0 => return AccessResult::Pass,
             1 => {
-                stat.st_dev = i32::from_be_bytes(self.recv4());
-                stat.st_ino = u32::from_be_bytes(self.recv4()) as u64;
-                stat.st_mode = u32::from_be_bytes(self.recv4()) as u16;
-                stat.st_nlink = u32::from_be_bytes(self.recv4()) as u16;
-                stat.st_uid = u32::from_be_bytes(self.recv4());
-                stat.st_gid = u32::from_be_bytes(self.recv4());
-                stat.st_rdev = i32::from_be_bytes(self.recv4());
-                stat.st_size = u32::from_be_bytes(self.recv4()) as i64;
-                stat.st_blksize = i32::from_be_bytes(self.recv4());
-                stat.st_blocks = u32::from_be_bytes(self.recv4()) as i64;
-                stat.st_atime = u32::from_be_bytes(self.recv4()) as i64;
-                stat.st_atime_nsec = u32::from_be_bytes(self.recv4()) as i64;
-                stat.st_ctime = u32::from_be_bytes(self.recv4()) as i64;
-                stat.st_ctime_nsec = u32::from_be_bytes(self.recv4()) as i64;
-                stat.st_mtime = u32::from_be_bytes(self.recv4()) as i64;
-                stat.st_mtime_nsec = u32::from_be_bytes(self.recv4()) as i64;
+                stat.st_dev = i32::from_le_bytes(self.recv4());
+                stat.st_ino = u32::from_le_bytes(self.recv4()) as u64;
+                stat.st_mode = u32::from_le_bytes(self.recv4()) as u16;
+                stat.st_nlink = u32::from_le_bytes(self.recv4()) as u16;
+                stat.st_uid = u32::from_le_bytes(self.recv4());
+                stat.st_gid = u32::from_le_bytes(self.recv4());
+                stat.st_rdev = i32::from_le_bytes(self.recv4());
+                stat.st_size = u32::from_le_bytes(self.recv4()) as i64;
+                stat.st_blksize = i32::from_le_bytes(self.recv4());
+                stat.st_blocks = u32::from_le_bytes(self.recv4()) as i64;
+                stat.st_atime = u32::from_le_bytes(self.recv4()) as i64;
+                stat.st_atime_nsec = u32::from_le_bytes(self.recv4()) as i64;
+                stat.st_ctime = u32::from_le_bytes(self.recv4()) as i64;
+                stat.st_ctime_nsec = u32::from_le_bytes(self.recv4()) as i64;
+                stat.st_mtime = u32::from_le_bytes(self.recv4()) as i64;
+                stat.st_mtime_nsec = u32::from_le_bytes(self.recv4()) as i64;
                 return AccessResult::Ok;
             }
             2 => return AccessResult::ENoEnt,
