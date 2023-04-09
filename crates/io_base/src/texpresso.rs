@@ -13,32 +13,12 @@ pub struct TexpressoIOState {
     client : txp::Client,
     released: Vec<txp::FileId>,
     next_id: txp::FileId,
-    last_seen: Option<(txp::FileId, u32)>
+    gen: usize,
+    last_passed_open: String,
 }
 
 /// TODO
 pub type TexpressoIO = Rc<RefCell<TexpressoIOState>>;
-
-impl TexpressoIOState {
-    fn flush_seen(&mut self) {
-        if let Some((id, pos)) = self.last_seen {
-            self.client.seen(id, pos);
-            self.last_seen = None;
-        }
-    }
-
-    fn set_seen(&mut self, id: txp::FileId, pos: u32) {
-        if let Some((id2, _)) = self.last_seen {
-            if id != id2 { self.client.seen(id, pos); }
-        };
-        self.last_seen = Some((id, pos));
-    }
-
-    fn client(&mut self) -> &mut txp::Client {
-        self.flush_seen();
-        &mut self.client
-    }
-}
 
 /// TODO
 pub struct TexpressoReader {
@@ -49,7 +29,7 @@ pub struct TexpressoReader {
     buf_pos: u32,
     buf_len: u32,
     size: Option<usize>,
-    seen: usize,
+    gen: usize,
 }
 
 impl TexpressoReader {
@@ -58,50 +38,54 @@ impl TexpressoReader {
             Some(size) => size,
             None => {
                 let mut io = self.io.borrow_mut();
-                let size = io.client().size(self.id) as usize;
+                let size = io.client.size(self.id) as usize;
                 self.size = Some(size);
                 size
             }
-        }
-    }
-
-    fn mark_seen(&mut self, seen: usize) {
-        if seen > self.seen {
-            self.seen = seen;
-            let mut io = self.io.borrow_mut();
-            io.set_seen(self.id, seen as u32);
         }
     }
 }
 
 impl io::Read for TexpressoReader {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let mut io = self.io.borrow_mut();
+        if io.gen != self.gen {
+            self.abs_pos += self.buf_pos as usize;
+            self.buf_pos = 0;
+            self.buf_len = 0;
+            self.gen = io.gen;
+        }
         if self.buf_pos == self.buf_len {
-            let mut io = self.io.borrow_mut();
             let abs_pos = self.abs_pos + self.buf_pos as usize;
-            match io.client().read(self.id, abs_pos as u32, &mut self.buf) {
-                Some(size) => {
-                    self.abs_pos = abs_pos;
-                    self.buf_pos = 0;
-                    self.buf_len = size as u32;
-                }
-                None => {
-                    io.flush_seen();
-                    io.client.flush();
-                    let child = unsafe { io.client.fork() };
-                    if child == 0 {
-                        io.client.child(unsafe{libc::getpid()})
-                    } else {
-                        let mut status : i32 = 1;
-                        let result =
-                            unsafe { wait(std::ptr::addr_of_mut!(status)) };
-                        if result == -1 {
-                            panic!("TeXpresso: fork: error while waiting for child");
-                        };
-                        if result != child {
-                            panic!("TeXpresso: fork: unexpected pid");
-                        };
-                        io.client.back(unsafe{libc::getpid()}, child, status as u32);
+            loop {
+                match io.client.read(self.id, abs_pos as u32, &mut self.buf) {
+                    Some(size) => {
+                        self.abs_pos = abs_pos;
+                        self.buf_pos = 0;
+                        self.buf_len = size as u32;
+                        break;
+                    }
+                    None => {
+                        io.client.flush();
+                        io.gen += 1;
+                        let child = unsafe { io.client.fork() };
+                        if child == 0 {
+                            io.client.child(unsafe{libc::getpid()})
+                        } else {
+                            let mut status : i32 = 1;
+                            let result =
+                                unsafe { wait(std::ptr::addr_of_mut!(status)) };
+                            if result == -1 {
+                                panic!("TeXpresso: fork: error while waiting for child");
+                            };
+                            if result != child {
+                                panic!("TeXpresso: fork: unexpected pid");
+                            };
+                            let resume = io.client.back(unsafe{libc::getpid()}, child, status as u32);
+                            if !resume {
+                                std::process::exit(1)
+                            }
+                        }
                     }
                 }
             }
@@ -118,7 +102,7 @@ impl io::Read for TexpressoReader {
             self.buf_pos = self.buf_len;
             rem
         };
-        self.mark_seen(self.abs_pos + self.buf_pos as usize);
+        io.client.seen(self.id, self.abs_pos as u32 + self.buf_pos);
         Ok(n)
     }
 
@@ -158,16 +142,20 @@ impl InputFeatures for TexpressoReader {
 /// TODO
 pub struct TexpressoWriter {
     io: TexpressoIO,
-    abs_pos: usize,
     id: txp::FileId,
-    buf_pos: u32,
-    buf: [u8; 1024],
+    pos: usize,
 }
 
 impl TexpressoIOState {
     /// TODO
     pub fn new(client: txp::Client) -> TexpressoIOState {
-        TexpressoIOState{client, released: Vec::new(), next_id: 0, last_seen: None}
+        TexpressoIOState {
+            client,
+            released: Vec::new(),
+            next_id: 0,
+            gen: 0,
+            last_passed_open: "".to_string()
+        }
     }
 
     /// TODO
@@ -213,54 +201,31 @@ impl TexpressoIOState {
 impl Drop for TexpressoReader {
     fn drop(&mut self) {
         let mut io = self.io.borrow_mut();
-        io.client().close(self.id);
+        io.client.close(self.id);
         io.release_id(self.id)
-    }
-}
-
-impl TexpressoWriter {
-    fn internal_flush(&mut self) {
-        if self.buf_pos > 0 {
-            let mut io = self.io.borrow_mut();
-            io.client().write(self.id, self.abs_pos as u32, &self.buf[0..self.buf_pos as usize]);
-            self.abs_pos += self.buf_pos as usize;
-            self.buf_pos = 0;
-        }
     }
 }
 
 impl Drop for TexpressoWriter {
     fn drop(&mut self) {
-        self.internal_flush();
         let mut io = self.io.borrow_mut();
-        io.client().close(self.id);
+        io.client.close(self.id);
         io.release_id(self.id)
     }
 }
 
 impl io::Write for TexpressoWriter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let pos = self.buf_pos as usize;
-        let len = buf.len();
-        if pos + len <= 1024 {
-            self.buf[pos .. pos + len].copy_from_slice(buf);
-            self.buf_pos = (pos + len) as u32;
-            return Ok(len)
-        };
-        self.internal_flush();
-        if len <= 1024 {
-            self.buf[0 .. len].copy_from_slice(buf);
-            self.buf_pos = len as u32;
-            return Ok(len)
-        }
         let mut io = self.io.borrow_mut();
-        io.client().write(self.id, self.abs_pos as u32, buf);
-        self.abs_pos += len;
+        io.client.write(self.id, self.pos as u32, buf);
+        let len = buf.len();
+        self.pos += len;
         Ok(len)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.internal_flush();
+        let mut io = self.io.borrow_mut();
+        io.client.flush();
         Ok(())
     }
 }
@@ -271,12 +236,12 @@ impl IoProvider for TexpressoIO {
         let (id, open) = {
             let mut io = self.borrow_mut();
             let id = io.alloc_id();
-            let open = io.client().open(id, name, "w");
+            let open = io.client.open(id, name, "w");
             if !open { io.release_id(id); };
             (id, open)
         };
         if open {
-            OpenResult::Ok(OutputHandle::new(name, TexpressoWriter{io: self.clone(), id, abs_pos: 0, buf: [0; 1024], buf_pos: 0}))
+            OpenResult::Ok(OutputHandle::new(name, TexpressoWriter{io: self.clone(), id, pos: 0}))
         } else {
             OpenResult::NotAvailable
         }
@@ -294,23 +259,27 @@ impl IoProvider for TexpressoIO {
         name: &str,
         _status: &mut dyn StatusBackend,
     ) -> OpenResult<InputHandle> {
-        let (id, open) = {
+        let (id, open, gen) = {
             let mut io = self.borrow_mut();
+            if name == io.last_passed_open {
+                return OpenResult::NotAvailable
+            } else {
+                io.last_passed_open = name.to_string()
+            }
             let id = io.alloc_id();
-            let open = io.client().open(id, name, "r?");
+            let open = io.client.open(id, name, "r?");
             if !open { io.release_id(id); };
-            (id, open)
+            (id, open, io.gen)
         };
         if open {
             let reader = TexpressoReader {
                 io: self.clone(),
-                id,
+                id, gen,
                 abs_pos: 0,
                 buf: [0; 1024],
                 buf_pos: 0,
                 buf_len: 0,
                 size: None,
-                seen: 0,
             };
             OpenResult::Ok(InputHandle::new(name, reader, InputOrigin::Other))
         } else {
