@@ -238,6 +238,7 @@ impl IoProvider for TexpressoIO {
             let id = io.alloc_id();
             let open = io.client.open(id, name, "w");
             if !open { io.release_id(id); };
+            io.last_passed_open = "".to_string();
             (id, open)
         };
         if open {
@@ -263,12 +264,15 @@ impl IoProvider for TexpressoIO {
             let mut io = self.borrow_mut();
             if name == io.last_passed_open {
                 return OpenResult::NotAvailable
-            } else {
-                io.last_passed_open = name.to_string()
-            }
+            };
             let id = io.alloc_id();
             let open = io.client.open(id, name, "r?");
-            if !open { io.release_id(id); };
+            if open {
+                io.last_passed_open = "".to_string();
+            } else {
+                io.last_passed_open = name.to_string();
+                io.release_id(id);
+            }
             (id, open, io.gen)
         };
         if open {
