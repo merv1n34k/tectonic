@@ -1126,7 +1126,10 @@ impl ProcessingSessionBuilder {
                 };
 
                 filesystem_root = parent.clone();
-                let pio: Box<dyn IoProvider> = Box::new(FilesystemPrimaryInputIo::new(&p));
+                let pio: Box<dyn IoProvider> = match texpresso {
+                    None => Box::new(FilesystemPrimaryInputIo::new(&p)),
+                    Some(ref texpresso) => Box::new(texpresso.clone())
+                };
                 (pio, Some(p), parent)
             }
 
