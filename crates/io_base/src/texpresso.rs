@@ -2,6 +2,7 @@
 
 // use super::{InputHandle, IoProvider, OpenResult, OutputHandle};
 use std::{rc::Rc, cell::RefCell, io, env};
+use libc::wait;
 use texpresso_protocol as txp;
 use tectonic_status_base::StatusBackend;
 use crate::{IoProvider, OpenResult, InputHandle, OutputHandle,
@@ -85,7 +86,23 @@ impl io::Read for TexpressoReader {
                     self.buf_len = size as u32;
                 }
                 None => {
-                    panic!("texpresso: TODO Fork!");
+                    io.flush_seen();
+                    io.client.flush();
+                    let child = unsafe { io.client.fork() };
+                    if child == 0 {
+                        io.client.child(unsafe{libc::getpid()})
+                    } else {
+                        let mut status : i32 = 1;
+                        let result =
+                            unsafe { wait(std::ptr::addr_of_mut!(status)) };
+                        if result == -1 {
+                            panic!("TeXpresso: fork: error while waiting for child");
+                        };
+                        if result != child {
+                            panic!("TeXpresso: fork: unexpected pid");
+                        };
+                        io.client.back(unsafe{libc::getpid()}, child, status as u32);
+                    }
                 }
             }
         };
@@ -141,8 +158,10 @@ impl InputFeatures for TexpressoReader {
 /// TODO
 pub struct TexpressoWriter {
     io: TexpressoIO,
-    id: txp::FileId,
     abs_pos: usize,
+    id: txp::FileId,
+    buf_pos: u32,
+    buf: [u8; 1024],
 }
 
 impl TexpressoIOState {
@@ -181,12 +200,12 @@ impl TexpressoIOState {
                 result
             }
         };
-        eprintln!("alloc_id {id}");
+        // eprintln!("alloc_id {id}");
         id
     }
 
     fn release_id(&mut self, id: txp::FileId) {
-        eprintln!("release_id {id}");
+        // eprintln!("release_id {id}");
         self.released.push(id);
     }
 }
@@ -199,8 +218,20 @@ impl Drop for TexpressoReader {
     }
 }
 
+impl TexpressoWriter {
+    fn internal_flush(&mut self) {
+        if self.buf_pos > 0 {
+            let mut io = self.io.borrow_mut();
+            io.client().write(self.id, self.abs_pos as u32, &self.buf[0..self.buf_pos as usize]);
+            self.abs_pos += self.buf_pos as usize;
+            self.buf_pos = 0;
+        }
+    }
+}
+
 impl Drop for TexpressoWriter {
     fn drop(&mut self) {
+        self.internal_flush();
         let mut io = self.io.borrow_mut();
         io.client().close(self.id);
         io.release_id(self.id)
@@ -209,13 +240,27 @@ impl Drop for TexpressoWriter {
 
 impl io::Write for TexpressoWriter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let pos = self.buf_pos as usize;
+        let len = buf.len();
+        if pos + len <= 1024 {
+            self.buf[pos .. pos + len].copy_from_slice(buf);
+            self.buf_pos = (pos + len) as u32;
+            return Ok(len)
+        };
+        self.internal_flush();
+        if len <= 1024 {
+            self.buf[0 .. len].copy_from_slice(buf);
+            self.buf_pos = len as u32;
+            return Ok(len)
+        }
         let mut io = self.io.borrow_mut();
         io.client().write(self.id, self.abs_pos as u32, buf);
-        self.abs_pos += buf.len();
-        Ok(buf.len())
+        self.abs_pos += len;
+        Ok(len)
     }
 
     fn flush(&mut self) -> io::Result<()> {
+        self.internal_flush();
         Ok(())
     }
 }
@@ -231,7 +276,7 @@ impl IoProvider for TexpressoIO {
             (id, open)
         };
         if open {
-            OpenResult::Ok(OutputHandle::new(name, TexpressoWriter{io: self.clone(), id, abs_pos: 0}))
+            OpenResult::Ok(OutputHandle::new(name, TexpressoWriter{io: self.clone(), id, abs_pos: 0, buf: [0; 1024], buf_pos: 0}))
         } else {
             OpenResult::NotAvailable
         }
@@ -279,5 +324,9 @@ impl IoProvider for TexpressoIO {
         _status: &mut dyn StatusBackend,
     ) -> OpenResult<InputHandle> {
         OpenResult::NotAvailable
+    }
+
+    fn input_open_primary(&mut self, status: &mut dyn StatusBackend) -> OpenResult<InputHandle> {
+        self.input_open_name("main.tex", status)
     }
 }

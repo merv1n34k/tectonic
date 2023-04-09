@@ -55,6 +55,10 @@ impl Client {
         Self::connect(File::from_raw_fd(fd))
     }
 
+    pub fn flush(&mut self) {
+        self.file.flush().unwrap();
+    }
+
     fn send_str(&mut self, text: &str) -> () {
         write_or_panic(&mut self.file, text.as_bytes());
         write_or_panic(&mut self.file, b"\x00");
