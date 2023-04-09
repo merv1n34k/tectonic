@@ -668,6 +668,8 @@ impl DriverHooks for BridgeState {
         digest: Option<DigestData>,
         _status: &mut dyn StatusBackend,
     ) {
+        if self.texpresso.is_some() { return }
+
         let summ = self
             .events
             .get_mut(&name)
