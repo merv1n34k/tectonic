@@ -1,7 +1,7 @@
 //! TODO
 
 // use super::{InputHandle, IoProvider, OpenResult, OutputHandle};
-use std::{rc::Rc, cell::RefCell, io, env};
+use std::{rc::Rc, cell::{RefCell, RefMut}, io, env, borrow::Borrow};
 use libc::wait;
 use texpresso_protocol as txp;
 use tectonic_status_base::StatusBackend;
@@ -18,11 +18,53 @@ pub struct TexpressoIOState {
 }
 
 /// TODO
-pub type TexpressoIO = Rc<RefCell<TexpressoIOState>>;
+pub type TexpressoIOStateRef = Rc<RefCell<TexpressoIOState>>;
+
+/// TODO
+pub struct TexpressoIO {
+    state: TexpressoIOStateRef,
+    primary: String,
+}
+
+impl TexpressoIO {
+    fn borrow_mut(&self) -> RefMut<'_, TexpressoIOState> {
+        self.state.borrow_mut()
+    }
+
+    /// TODO
+    pub fn new(client: txp::Client, primary: &str) -> TexpressoIO {
+        TexpressoIO {
+            state: Rc::new(RefCell::new(TexpressoIOState::new(client))),
+            primary: primary.into()
+        }
+    }
+
+
+    /// TODO
+    pub unsafe fn client_from_env() -> Option<txp::Client> {
+        match env::var("TEXPRESSO_FD") {
+            Ok(val) => Some(txp::Client::connect_raw_fd(val.parse::<i32>().unwrap())),
+            Err(_) => None
+        }
+    }
+
+    /// TODO
+    pub fn new_from_env(primary: &str) -> Option<TexpressoIO> {
+        (unsafe {Self::client_from_env()})
+            .map(|client| Self::new(client, primary))
+    }
+
+    /// TODO
+    pub fn clone(&self) -> Self {
+        let primary = self.primary.clone();
+        let state = self.state.clone();
+        TexpressoIO {state, primary}
+    }
+}
 
 /// TODO
 pub struct TexpressoReader {
-    io: TexpressoIO,
+    io: TexpressoIOStateRef,
     id: txp::FileId,
     abs_pos: usize,
     buf: [u8; 1024],
@@ -141,7 +183,7 @@ impl InputFeatures for TexpressoReader {
 
 /// TODO
 pub struct TexpressoWriter {
-    io: TexpressoIO,
+    io: TexpressoIOStateRef,
     id: txp::FileId,
     pos: usize,
 }
@@ -154,20 +196,7 @@ impl TexpressoIOState {
             released: Vec::new(),
             next_id: 0,
             gen: 0,
-            last_passed_open: "".to_string()
-        }
-    }
-
-    /// TODO
-    pub fn new_texpresso_io(client: txp::Client) -> TexpressoIO {
-        TexpressoIO::new(RefCell::new(Self::new(client)))
-    }
-
-    /// TODO
-    pub unsafe fn client_from_env() -> Option<txp::Client> {
-        match env::var("TEXPRESSO_FD") {
-            Ok(val) => Some(txp::Client::connect_raw_fd(val.parse::<i32>().unwrap())),
-            Err(_) => None
+            last_passed_open: "".to_string(),
         }
     }
 
@@ -242,7 +271,7 @@ impl IoProvider for TexpressoIO {
             (id, open)
         };
         if open {
-            OpenResult::Ok(OutputHandle::new(name, TexpressoWriter{io: self.clone(), id, pos: 0}))
+            OpenResult::Ok(OutputHandle::new(name, TexpressoWriter{io: self.state.clone(), id, pos: 0}))
         } else {
             OpenResult::NotAvailable
         }
@@ -277,7 +306,7 @@ impl IoProvider for TexpressoIO {
         };
         if open {
             let reader = TexpressoReader {
-                io: self.clone(),
+                io: self.state.clone(),
                 id, gen,
                 abs_pos: 0,
                 buf: [0; 1024],
@@ -300,6 +329,6 @@ impl IoProvider for TexpressoIO {
     }
 
     fn input_open_primary(&mut self, status: &mut dyn StatusBackend) -> OpenResult<InputHandle> {
-        self.input_open_name("main.tex", status)
+        self.input_open_name(&self.primary.clone(), status)
     }
 }
