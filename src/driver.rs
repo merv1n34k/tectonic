@@ -1105,14 +1105,7 @@ impl ProcessingSessionBuilder {
 
         let mut filesystem_root = self.filesystem_root.unwrap_or_default();
 
-        let texpresso = unsafe {
-            match texpresso::TexpressoIOState::client_from_env() {
-                None => None,
-                Some(client) =>
-                    Some(texpresso::TexpressoIOState::new_texpresso_io(client))
-            }
-        };
-        let (pio, primary_input_path, default_output_path) = match self.primary_input {
+        let (pio, primary_input_path, default_output_path, texpresso) = match self.primary_input {
             PrimaryInputMode::Path(p) => {
                 // Set the filesystem root (that's the directory we'll search
                 // for files in) to be the same directory as the main input
@@ -1128,11 +1121,14 @@ impl ProcessingSessionBuilder {
                 };
 
                 filesystem_root = parent.clone();
+
+                let texpresso = p.to_str().and_then(texpresso::TexpressoIO::new_from_env);
+
                 let pio: Box<dyn IoProvider> = match texpresso {
                     None => Box::new(FilesystemPrimaryInputIo::new(&p)),
                     Some(ref texpresso) => Box::new(texpresso.clone())
                 };
-                (pio, Some(p), parent)
+                (pio, Some(p), parent, texpresso)
             }
 
             PrimaryInputMode::Stdin => {
@@ -1145,13 +1141,13 @@ impl ProcessingSessionBuilder {
                 // so we might as well do that now.
                 let pio = ctry!(BufferedPrimaryIo::from_stdin(); "error reading standard input");
                 let pio: Box<dyn IoProvider> = Box::new(pio);
-                (pio, None, "".into())
+                (pio, None, "".into(), None)
             }
 
             PrimaryInputMode::Buffer(buf) => {
                 // Same behavior as with stdin.
                 let pio: Box<dyn IoProvider> = Box::new(BufferedPrimaryIo::from_buffer(buf));
-                (pio, None, "".into())
+                (pio, None, "".into(), None)
             }
         };
 
@@ -1185,6 +1181,11 @@ impl ProcessingSessionBuilder {
         let filesystem = FilesystemIo::new(&filesystem_root, false, true, hidden_input_paths);
 
         let mem = MemoryIo::new(true);
+
+        let pass = match texpresso {
+            Some(_) => PassSetting::Tex,
+            None => self.pass
+        };
 
         let bs = BridgeState {
             primary_input: pio,
@@ -1242,9 +1243,7 @@ impl ProcessingSessionBuilder {
 
         Ok(ProcessingSession {
             security: self.security,
-            bs,
-            pass: self.pass,
-            primary_input_path,
+            bs, pass, primary_input_path,
             primary_input_tex_path: tex_input_name,
             format_name: self.format_name.unwrap(),
             tex_aux_path: aux_path.display().to_string(),
