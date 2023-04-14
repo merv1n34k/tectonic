@@ -314,7 +314,7 @@ impl IoProvider for TexpressoIO {
                 buf_len: 0,
                 size: None,
             };
-            OpenResult::Ok(InputHandle::new(name, reader, InputOrigin::Other))
+            OpenResult::Ok(InputHandle::new_read_only(name, reader, InputOrigin::Other))
         } else {
             OpenResult::NotAvailable
         }
