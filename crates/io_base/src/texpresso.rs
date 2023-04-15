@@ -271,7 +271,7 @@ impl IoProvider for TexpressoIO {
             (id, open)
         };
         if open {
-            OpenResult::Ok(OutputHandle::new(name, TexpressoWriter{io: self.state.clone(), id, pos: 0}))
+            OpenResult::Ok(OutputHandle::new_without_digest(name, TexpressoWriter{io: self.state.clone(), id, pos: 0}))
         } else {
             OpenResult::NotAvailable
         }
