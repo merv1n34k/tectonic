@@ -155,7 +155,7 @@ fn main() {
     // all so that we can print out the word "error:" in red. This code
     // parallels various bits of the `error_chain` crate.
 
-    if let Err(e) = args.compile.execute(config, &mut *status) {
+    if let Err(e) = args.compile.execute(config, &mut *status, false) {
         status.report_error(&SyncError::new(e).into());
         process::exit(1)
     }

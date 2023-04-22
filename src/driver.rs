@@ -36,7 +36,7 @@ use tectonic_io_base::{
     filesystem::{FilesystemIo, FilesystemPrimaryInputIo},
     stdstreams::{BufferedPrimaryIo, GenuineStdoutIo},
     InputHandle, IoProvider, OpenResult, OutputHandle,
-    texpresso::{self, TexpressoIO},
+    texpresso::TexpressoIO,
 };
 
 use crate::{
@@ -824,6 +824,7 @@ pub struct ProcessingSessionBuilder {
     keep_intermediates: bool,
     keep_logs: bool,
     synctex: bool,
+    texpresso: Option<TexpressoIO>,
     build_date: Option<SystemTime>,
     unstables: UnstableOptions,
     shell_escape_mode: ShellEscapeMode,
@@ -1001,6 +1002,12 @@ impl ProcessingSessionBuilder {
         self
     }
 
+    /// Set TeXpresso server
+    pub fn texpresso(&mut self, texpresso: Option<TexpressoIO>) -> &mut Self {
+        self.texpresso = texpresso;
+        self
+    }
+
     /// Enable "shell escape" commands in the engines, and use the specified
     /// directory for shell-escape work. The caller is responsible for the
     /// creation and/or destruction of this directory. The default is to
@@ -1105,7 +1112,7 @@ impl ProcessingSessionBuilder {
 
         let mut filesystem_root = self.filesystem_root.unwrap_or_default();
 
-        let (pio, primary_input_path, default_output_path, texpresso) = match self.primary_input {
+        let (pio, primary_input_path, default_output_path) = match self.primary_input {
             PrimaryInputMode::Path(p) => {
                 // Set the filesystem root (that's the directory we'll search
                 // for files in) to be the same directory as the main input
@@ -1122,13 +1129,11 @@ impl ProcessingSessionBuilder {
 
                 filesystem_root = parent.clone();
 
-                let texpresso = p.to_str().and_then(texpresso::TexpressoIO::new_from_env);
-
-                let pio: Box<dyn IoProvider> = match texpresso {
+                let pio: Box<dyn IoProvider> = match self.texpresso {
                     None => Box::new(FilesystemPrimaryInputIo::new(&p)),
                     Some(ref texpresso) => Box::new(texpresso.clone())
                 };
-                (pio, Some(p), parent, texpresso)
+                (pio, Some(p), parent)
             }
 
             PrimaryInputMode::Stdin => {
@@ -1139,15 +1144,17 @@ impl ProcessingSessionBuilder {
                 // Note that, due to the expected need to rerun the engine
                 // multiple times, we'll need to buffer stdin in its entirety,
                 // so we might as well do that now.
+                assert!(self.texpresso.is_none());
                 let pio = ctry!(BufferedPrimaryIo::from_stdin(); "error reading standard input");
                 let pio: Box<dyn IoProvider> = Box::new(pio);
-                (pio, None, "".into(), None)
+                (pio, None, "".into())
             }
 
             PrimaryInputMode::Buffer(buf) => {
                 // Same behavior as with stdin.
+                assert!(self.texpresso.is_none());
                 let pio: Box<dyn IoProvider> = Box::new(BufferedPrimaryIo::from_buffer(buf));
-                (pio, None, "".into(), None)
+                (pio, None, "".into())
             }
         };
 
@@ -1182,15 +1189,10 @@ impl ProcessingSessionBuilder {
 
         let mem = MemoryIo::new(true);
 
-        let pass = match texpresso {
-            Some(_) => PassSetting::Tex,
-            None => self.pass
-        };
-
         let bs = BridgeState {
             primary_input: pio,
             mem,
-            texpresso,
+            texpresso: self.texpresso,
             filesystem,
             extra_search_paths,
             shell_escape_work: None,
@@ -1243,7 +1245,7 @@ impl ProcessingSessionBuilder {
 
         Ok(ProcessingSession {
             security: self.security,
-            bs, pass, primary_input_path,
+            bs, pass : self.pass, primary_input_path,
             primary_input_tex_path: tex_input_name,
             format_name: self.format_name.unwrap(),
             tex_aux_path: aux_path.display().to_string(),

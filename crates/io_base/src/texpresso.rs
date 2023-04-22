@@ -1,7 +1,7 @@
 //! TODO
 
 // use super::{InputHandle, IoProvider, OpenResult, OutputHandle};
-use std::{rc::Rc, cell::{RefCell, RefMut}, io, env, borrow::Borrow};
+use std::{rc::Rc, cell::{RefCell, RefMut}, io, env};
 use libc::wait;
 use texpresso_protocol as txp;
 use tectonic_status_base::StatusBackend;
@@ -35,7 +35,7 @@ impl TexpressoIO {
     pub fn new(client: txp::Client, primary: &str) -> TexpressoIO {
         TexpressoIO {
             state: Rc::new(RefCell::new(TexpressoIOState::new(client))),
-            primary: primary.into()
+            primary: primary.into(),
         }
     }
 
@@ -59,6 +59,11 @@ impl TexpressoIO {
         let primary = self.primary.clone();
         let state = self.state.clone();
         TexpressoIO {state, primary}
+    }
+
+    /// TODO
+    pub fn stdout(&self) -> TexpressoStdout {
+        TexpressoStdout{io: self.state.clone()}
     }
 }
 
@@ -259,6 +264,26 @@ impl io::Write for TexpressoWriter {
     }
 }
 
+/// TODO
+#[derive(Clone)]
+pub struct TexpressoStdout {
+    io: TexpressoIOStateRef
+}
+
+impl io::Write for TexpressoStdout {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let mut io = self.io.borrow_mut();
+        io.client.write(-1, 0, buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        let mut io = self.io.borrow_mut();
+        io.client.flush();
+        Ok(())
+    }
+}
+
 impl IoProvider for TexpressoIO {
     /// Open the named file for output.
     fn output_open_name(&mut self, name: &str) -> OpenResult<OutputHandle> {
@@ -279,8 +304,8 @@ impl IoProvider for TexpressoIO {
 
     /// Open the standard output stream.
     fn output_open_stdout(&mut self) -> OpenResult<OutputHandle> {
-        //return self.output_open_name("stdout");
-        return OpenResult::NotAvailable
+        OpenResult::NotAvailable
+        // OpenResult::Ok(OutputHandle::new_without_digest("stdout", self.stdout()))
     }
 
     /// Open the named file for input.
