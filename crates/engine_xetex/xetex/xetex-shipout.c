@@ -2496,25 +2496,28 @@ static void isync_init(void)
     isync_begin_page();
 }
 
+static void isync_record_input(int input, const char *path)
+{
+  if (!path) return;
+
+  char buffer[100];
+  dvi_out(XXX1);
+  int hlen = sprintf(buffer, "Input:%d:", isync_reg_input);
+  int plen = strlen(path);
+  dvi_out(hlen + plen);
+  for (int i = 0; i < hlen; ++i)
+    dvi_out(buffer[i]);
+  for (int i = 0; i < plen; ++i)
+    dvi_out(path[i]);
+}
+
 void isync_output(int input, int line)
 {
   char buffer[100];
   if (input != isync_cur_input)
   {
     for (; isync_reg_input <= input; isync_reg_input += 1)
-    {
-      const char *path = synctex_get_input(isync_reg_input);
-      if (!path)
-        continue;
-      dvi_out(XXX1);
-      int hlen = sprintf(buffer, "Input:%d:", isync_reg_input);
-      int plen = strlen(path);
-      dvi_out(hlen + plen);
-      for (int i = 0; i < hlen; ++i)
-        dvi_out(buffer[i]);
-      for (int i = 0; i < plen; ++i)
-        dvi_out(path[i]);
-    }
+        isync_record_input(input, synctex_get_input(input));
 
     int pre_input = isync_pre_input;
     int pre_line = isync_pre_line;

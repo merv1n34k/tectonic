@@ -12,12 +12,14 @@ use std::{
 use structopt::StructOpt;
 use tectonic_bridge_core::{SecuritySettings, SecurityStance};
 
+use tectonic_io_base::texpresso::TexpressoIO;
+
 use tectonic::{
     config::PersistentConfig,
     driver::{OutputFormat, PassSetting, ProcessingSession, ProcessingSessionBuilder},
     errmsg,
     errors::{ErrorKind, Result},
-    status::StatusBackend,
+    status::{StatusBackend, texpresso::TexpressoStatusBackend},
     tt_error, tt_note,
     unstable_opts::{UnstableArg, UnstableOptions},
 };
@@ -95,7 +97,8 @@ pub struct CompileOptions {
 }
 
 impl CompileOptions {
-    pub fn execute(self, config: PersistentConfig, status: &mut dyn StatusBackend) -> Result<i32> {
+    pub fn execute(self, config: PersistentConfig, status: &mut dyn
+                   StatusBackend, texpresso: bool) -> Result<i32> {
         let unstable = UnstableOptions::from_unstable_args(self.unstable.into_iter());
 
         // Default to allowing insecure since it would be super duper annoying
@@ -110,6 +113,7 @@ impl CompileOptions {
 
         let mut sess_builder =
             ProcessingSessionBuilder::new_with_security(SecuritySettings::new(stance));
+
         let format_path = self.format;
         let deterministic_mode = unstable.deterministic_mode;
         sess_builder
@@ -136,6 +140,30 @@ impl CompileOptions {
         // Input and path setup
 
         let input_path = self.input;
+
+        let texpresso = if texpresso {
+            let ref input_path = if input_path == "-" { "texput.tex" } else { &input_path };
+            TexpressoIO::new_from_env(&input_path)
+        } else { None };
+
+        if texpresso.is_some() {
+            sess_builder.pass(PassSetting::Tex);
+        };
+
+        let mut texpresso_status = match texpresso {
+            None => None,
+            Some(ref texpresso) => {
+                let level = tectonic_status_base::ChatterLevel::Minimal;
+                let backend = TexpressoStatusBackend::new(level, texpresso.stdout());
+                Some(Box::new(backend) as Box<dyn StatusBackend>)
+            }
+        };
+
+        let status = match texpresso_status {
+            None => status,
+            Some(ref mut status) => &mut**status,
+        };
+
         if input_path == "-" {
             // Don't provide an input path to the ProcessingSession, so it will default to stdin.
             sess_builder.tex_input_name("texput.tex");
@@ -166,6 +194,8 @@ impl CompileOptions {
                 ));
             }
         }
+
+        sess_builder.texpresso(texpresso);
 
         if let Some(output_dir) = self.outdir {
             if !output_dir.is_dir() {
