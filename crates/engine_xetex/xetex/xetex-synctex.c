@@ -96,6 +96,8 @@ static struct {
         unsigned int not_void:1;    /*  Whether it really contains synchronization material */
         unsigned int warn:1;        /*  One shot warning flag */
         unsigned int output_p:1;    /*  Whether the output_directory is used */
+        unsigned int record:1;      /*  Record even if file is not open */
+        unsigned int isync:1;       /*  Inline SyncTeX information */
     } flags;
 } synctex_ctxt = {
     NULL, /* file */
@@ -116,6 +118,12 @@ static struct {
     { 0, 0, 0, 0, 0 } /* flags */
 };
 
+
+static void isync_now(void)
+{
+  if (synctex_ctxt.flags.isync)
+    isync_output(synctex_ctxt.tag, synctex_ctxt.line);
+}
 
 static char *
 get_current_name (void)
@@ -154,6 +162,7 @@ synctex_init_command(void)
     synctex_ctxt.flags.not_void = 0;
     synctex_ctxt.flags.warn = 0;
     synctex_ctxt.flags.output_p = 0;
+    synctex_ctxt.flags.isync = 1;
 
     if (synctex_enabled) {
         INTPAR(synctex) = 1;
@@ -218,8 +227,15 @@ synctex_dot_open(void)
     char *tmp = NULL, *the_name = NULL;
     size_t len;
 
-    if (synctex_ctxt.flags.off || !INTPAR(synctex))
+    if (synctex_ctxt.flags.off || !INTPAR(synctex) || synctex_ctxt.flags.isync)
+    {
+        if (!synctex_ctxt.flags.record)
+        {
+            synctex_record_input(1, synctex_ctxt.root_name);
+            synctex_ctxt.flags.record = 1;
+        }
         return NULL;
+    }
 
     if (synctex_ctxt.file)
         return synctex_ctxt.file;
@@ -259,6 +275,7 @@ synctex_dot_open(void)
     }
 
     synctex_ctxt.count = 0;
+    synctex_ctxt.flags.record = 1;
     return synctex_ctxt.file;
 
 fail:
@@ -288,7 +305,8 @@ synctex_prepare_content(void)
         return synctex_ctxt.file;
     }
 
-    synctexabort();
+    if (!synctex_ctxt.flags.isync)
+      synctexabort();
     return NULL;
 }
 
@@ -430,7 +448,7 @@ void synctex_teehs(void)
  *  a change in the context, this is the macro SYNCTEX_???_CONTEXT_DID_CHANGE. The
  *  SYNCTEX_IGNORE macro is used to detect unproperly initialized nodes.  See
  *  details in the implementation of the functions below.  */
-#   define SYNCTEX_IGNORE(NODE) synctex_ctxt.flags.off || !INTPAR(synctex) || !synctex_ctxt.file
+#   define SYNCTEX_IGNORE(NODE) synctex_ctxt.flags.off || !INTPAR(synctex) || !synctex_ctxt.flags.record
 
 
 /*  This message is sent when a vlist will be shipped out, more precisely at
@@ -447,7 +465,7 @@ void synctex_vlist(int32_t this_box)
     synctex_ctxt.recorder = NULL;   /*  reset  */
     synctex_ctxt.tag = SYNCTEX_TAG_MODEL(this_box,BOX);
     synctex_ctxt.line = SYNCTEX_LINE_MODEL(this_box,BOX);
-    isync_output(synctex_ctxt.tag, synctex_ctxt.line);
+    isync_now();
     synctex_ctxt.curh = SYNCTEX_CURH;
     synctex_ctxt.curv = SYNCTEX_CURV;
     synctex_record_node_vlist(this_box);
@@ -468,7 +486,7 @@ void synctex_tsilv(int32_t this_box)
     synctex_ctxt.node = this_box; /*  0 to reset  */
     synctex_ctxt.tag = SYNCTEX_TAG_MODEL(this_box,BOX);
     synctex_ctxt.line = SYNCTEX_LINE_MODEL(this_box,BOX);
-    isync_output(synctex_ctxt.tag, synctex_ctxt.line);
+    isync_now();
     synctex_ctxt.curh = SYNCTEX_CURH;
     synctex_ctxt.curv = SYNCTEX_CURV;
     synctex_ctxt.recorder = NULL;
@@ -487,7 +505,7 @@ void synctex_void_vlist(int32_t p, int32_t this_box __attribute__ ((unused)))
     synctex_ctxt.node = p;          /*  reset  */
     synctex_ctxt.tag = SYNCTEX_TAG_MODEL(p,BOX);
     synctex_ctxt.line = SYNCTEX_LINE_MODEL(p,BOX);
-    isync_output(synctex_ctxt.tag, synctex_ctxt.line);
+    isync_now();
     synctex_ctxt.curh = SYNCTEX_CURH;
     synctex_ctxt.curv = SYNCTEX_CURV;
     synctex_ctxt.recorder = NULL;   /*  reset  */
@@ -508,7 +526,7 @@ void synctex_hlist(int32_t this_box)
     synctex_ctxt.node = this_box;   /*  0 to reset  */
     synctex_ctxt.tag = SYNCTEX_TAG_MODEL(this_box,BOX);
     synctex_ctxt.line = SYNCTEX_LINE_MODEL(this_box,BOX);
-    isync_output(synctex_ctxt.tag, synctex_ctxt.line);
+    isync_now();
     synctex_ctxt.curh = SYNCTEX_CURH;
     synctex_ctxt.curv = SYNCTEX_CURV;
     synctex_ctxt.recorder = NULL;   /*  reset  */
@@ -530,7 +548,7 @@ void synctex_tsilh(int32_t this_box)
     synctex_ctxt.node = this_box;     /*  0 to force next node to be recorded!  */
     synctex_ctxt.tag = SYNCTEX_TAG_MODEL(this_box,BOX);
     synctex_ctxt.line = SYNCTEX_LINE_MODEL(this_box,BOX);
-    isync_output(synctex_ctxt.tag, synctex_ctxt.line);
+    isync_now();
     synctex_ctxt.curh = SYNCTEX_CURH;
     synctex_ctxt.curv = SYNCTEX_CURV;
     synctex_ctxt.recorder = NULL;   /*  reset  */
@@ -554,7 +572,7 @@ void synctex_void_hlist(int32_t p, int32_t this_box __attribute__ ((unused)))
     synctex_ctxt.node = p;          /*  0 to reset  */
     synctex_ctxt.tag = SYNCTEX_TAG_MODEL(p,BOX);
     synctex_ctxt.line = SYNCTEX_LINE_MODEL(p,BOX);
-    isync_output(synctex_ctxt.tag, synctex_ctxt.line);
+    isync_now();
     synctex_ctxt.curh = SYNCTEX_CURH;
     synctex_ctxt.curv = SYNCTEX_CURV;
     synctex_ctxt.recorder = NULL;   /*  reset  */
@@ -585,7 +603,7 @@ void synctex_math(int32_t p, int32_t this_box __attribute__ ((unused)))
     synctex_ctxt.node = p;
     synctex_ctxt.tag = SYNCTEX_TAG_MODEL(p,MATH);
     synctex_ctxt.line = SYNCTEX_LINE_MODEL(p,MATH);
-    isync_output(synctex_ctxt.tag, synctex_ctxt.line);
+    isync_now();
     synctex_ctxt.curh = SYNCTEX_CURH;
     synctex_ctxt.curv = SYNCTEX_CURV;
     synctex_ctxt.recorder = NULL;/*  no need to record once more  */
@@ -628,19 +646,19 @@ void synctex_horizontal_rule_or_glue(int32_t p, int32_t this_box __attribute__ (
         case rule_node:
             synctex_ctxt.tag = SYNCTEX_TAG_MODEL(p,RULE);
             synctex_ctxt.line = SYNCTEX_LINE_MODEL(p,RULE);
-            isync_output(synctex_ctxt.tag, synctex_ctxt.line);
+            isync_now();
             synctex_record_node_rule(p); /*  always record synchronously: maybe some text is outside the box  */
             break;
         case glue_node:
             synctex_ctxt.tag = SYNCTEX_TAG_MODEL(p,GLUE);
             synctex_ctxt.line = SYNCTEX_LINE_MODEL(p,GLUE);
-            isync_output(synctex_ctxt.tag, synctex_ctxt.line);
+            isync_now();
             synctex_record_node_glue(p); /*  always record synchronously: maybe some text is outside the box  */
             break;
         case kern_node:
             synctex_ctxt.tag = SYNCTEX_TAG_MODEL(p,KERN);
             synctex_ctxt.line = SYNCTEX_LINE_MODEL(p,KERN);
-            isync_output(synctex_ctxt.tag, synctex_ctxt.line);
+            isync_now();
             synctex_record_node_kern(p); /*  always record synchronously: maybe some text is outside the box  */
             break;
         default:
@@ -668,13 +686,13 @@ void synctex_kern(int32_t p, int32_t this_box)
             synctex_ctxt.node = p;
             synctex_ctxt.tag = SYNCTEX_TAG_MODEL(p,KERN);
             synctex_ctxt.line = SYNCTEX_LINE_MODEL(p,KERN);
-            isync_output(synctex_ctxt.tag, synctex_ctxt.line);
+            isync_now();
             synctex_ctxt.recorder = &synctex_record_node_kern;
         } else {
             synctex_ctxt.node = p;
             synctex_ctxt.tag = SYNCTEX_TAG_MODEL(p,KERN);
             synctex_ctxt.line = SYNCTEX_LINE_MODEL(p,KERN);
-            isync_output(synctex_ctxt.tag, synctex_ctxt.line);
+            isync_now();
             synctex_ctxt.recorder = NULL;
             /*  always record when the context has just changed
              *  and when not the first node  */
@@ -685,7 +703,7 @@ void synctex_kern(int32_t p, int32_t this_box)
         synctex_ctxt.node = p;
         synctex_ctxt.tag = SYNCTEX_TAG_MODEL(p,KERN);
         synctex_ctxt.line = SYNCTEX_LINE_MODEL(p,KERN);
-        isync_output(synctex_ctxt.tag, synctex_ctxt.line);
+        isync_now();
         synctex_ctxt.recorder = &synctex_record_node_kern;
     }
 }
@@ -737,7 +755,7 @@ synctex_record_settings(void)
 {
     int len;
 
-    if (NULL == synctex_ctxt.file)
+    if (!synctex_ctxt.file)
         return 0;
 
     len = ttstub_fprintf(synctex_ctxt.file, "Output:pdf\nMagnification:%i\nUnit:%i\nX Offset:0\nY Offset:0\n",
@@ -756,6 +774,9 @@ synctex_record_settings(void)
 static inline int
 synctex_record_preamble(void)
 {
+    if (!synctex_ctxt.file)
+        return 0;
+
     int len = ttstub_fprintf(synctex_ctxt.file, "SyncTeX Version:%i\n", SYNCTEX_VERSION);
 
     if (len > 0) {
@@ -780,8 +801,6 @@ const char *synctex_get_input(unsigned tag)
 static inline int
 synctex_record_input(int32_t tag, char *name)
 {
-    int len = ttstub_fprintf(synctex_ctxt.file, "Input:%i:%s\n", tag, name);
-
     if (tag >= recorded_inputs_cap)
     {
         int newcap = recorded_inputs_cap;
@@ -800,6 +819,11 @@ synctex_record_input(int32_t tag, char *name)
     }
     recorded_inputs[tag] = strdup(name);
 
+    if (!synctex_ctxt.file)
+        return 0;
+
+    int len = ttstub_fprintf(synctex_ctxt.file, "Input:%i:%s\n", tag, name);
+
     if (len > 0) {
         synctex_ctxt.total_length += len;
         return 0;
@@ -812,6 +836,9 @@ synctex_record_input(int32_t tag, char *name)
 static inline int
 synctex_record_anchor(void)
 {
+    if (!synctex_ctxt.file)
+        return 0;
+
     int len = ttstub_fprintf(synctex_ctxt.file, "!%i\n", synctex_ctxt.total_length);
 
     if (len > 0) {
@@ -827,6 +854,9 @@ synctex_record_anchor(void)
 static inline int
 synctex_record_content(void)
 {
+    if (!synctex_ctxt.file)
+        return 0;
+
     int len = ttstub_fprintf(synctex_ctxt.file, "Content:\n");
 
     if (len > 0) {
@@ -841,6 +871,9 @@ synctex_record_content(void)
 static inline int
 synctex_record_sheet(int32_t sheet)
 {
+    if (!synctex_ctxt.file)
+        return 0;
+
     if (0 == synctex_record_anchor()) {
         int len = ttstub_fprintf(synctex_ctxt.file, "{%i\n", sheet);
         SYNCTEX_RECORD_LEN_AND_RETURN_NOERR;
@@ -855,6 +888,9 @@ synctex_record_sheet(int32_t sheet)
 static inline int
 synctex_record_teehs(int32_t sheet)
 {
+    if (!synctex_ctxt.file)
+        return 0;
+
     if (0 == synctex_record_anchor()) {
         int len = ttstub_fprintf(synctex_ctxt.file, "}%i\n", sheet);
         SYNCTEX_RECORD_LEN_AND_RETURN_NOERR;
@@ -908,7 +944,6 @@ synctex_pdfrefxform(int objnum)
 static inline int
 synctex_record_pdfxform(int32_t form)
 {
-
     if (SYNCTEX_IGNORE(nothing)) {
         return 0;
     } else {
@@ -928,6 +963,8 @@ synctex_record_pdfxform(int32_t form)
 static inline int
 synctex_record_mrofxfdp(void)
 {
+    if (!synctex_ctxt.file)
+        return 0;
     if (0 == synctex_record_anchor()) {
         int len;
         /* XXX Tectonic: mistake here in original source, no %d in format string */
@@ -967,6 +1004,9 @@ synctex_record_node_pdfrefxform(int objnum) /* UNUSED form JL */
 static inline void
 synctex_record_node_void_vlist(int32_t p)
 {
+    if (!synctex_ctxt.file)
+        return;
+
     int len = ttstub_fprintf(synctex_ctxt.file, "v%i,%i:%i,%i:%i,%i,%i\n",
                       SYNCTEX_TAG_MODEL(p,BOX),
                       SYNCTEX_LINE_MODEL(p,BOX),
@@ -988,6 +1028,9 @@ synctex_record_node_void_vlist(int32_t p)
 static inline void
 synctex_record_node_vlist(int32_t p)
 {
+    if (!synctex_ctxt.file)
+        return;
+
     int len;
 
     synctex_ctxt.flags.not_void = 1;
@@ -1013,6 +1056,9 @@ synctex_record_node_vlist(int32_t p)
 static inline void
 synctex_record_node_tsilv(int32_t p __attribute__ ((unused)))
 {
+    if (!synctex_ctxt.file)
+        return;
+
     int len = ttstub_fprintf(synctex_ctxt.file, "]\n");
 
     if (len > 0) {
@@ -1026,6 +1072,8 @@ synctex_record_node_tsilv(int32_t p __attribute__ ((unused)))
 static inline void
 synctex_record_node_void_hlist(int32_t p)
 {
+    if (!synctex_ctxt.file)
+        return;
     int len = ttstub_fprintf(synctex_ctxt.file, "h%i,%i:%i,%i:%i,%i,%i\n",
                       SYNCTEX_TAG_MODEL(p,BOX),
                       SYNCTEX_LINE_MODEL(p,BOX),
@@ -1047,6 +1095,8 @@ synctex_record_node_void_hlist(int32_t p)
 static inline void
 synctex_record_node_hlist(int32_t p)
 {
+    if (!synctex_ctxt.file)
+        return;
     int len;
 
     synctex_ctxt.flags.not_void = 1;
@@ -1072,6 +1122,8 @@ synctex_record_node_hlist(int32_t p)
 static inline void
 synctex_record_node_tsilh(int32_t p __attribute__ ((unused)))
 {
+    if (!synctex_ctxt.file)
+        return;
     int len = ttstub_fprintf(synctex_ctxt.file, ")\n");
 
     if (len > 0) {
@@ -1085,6 +1137,8 @@ synctex_record_node_tsilh(int32_t p __attribute__ ((unused)))
 static inline int
 synctex_record_count(void)
 {
+    if (!synctex_ctxt.file)
+        return 0;
     int len = ttstub_fprintf(synctex_ctxt.file, "Count:%i\n", synctex_ctxt.count);
 
     if (len > 0) {
@@ -1099,6 +1153,8 @@ synctex_record_count(void)
 static inline int
 synctex_record_postamble(void)
 {
+    if (!synctex_ctxt.file)
+        return 0;
     if (0 == synctex_record_anchor()) {
         int len = ttstub_fprintf(synctex_ctxt.file, "Postamble:\n");
         if (len > 0) {
@@ -1120,6 +1176,8 @@ synctex_record_postamble(void)
 static inline void
 synctex_record_node_glue(int32_t p)
 {
+    if (!synctex_ctxt.file)
+        return;
     int len = ttstub_fprintf(synctex_ctxt.file, "g%i,%i:%i,%i\n",
                       SYNCTEX_TAG_MODEL(p,GLUE),
                       SYNCTEX_LINE_MODEL(p,GLUE),
@@ -1138,6 +1196,8 @@ synctex_record_node_glue(int32_t p)
 static inline void
 synctex_record_node_kern(int32_t p)
 {
+    if (!synctex_ctxt.file)
+        return;
     int len = ttstub_fprintf(synctex_ctxt.file, "k%i,%i:%i,%i:%i\n",
                       SYNCTEX_TAG_MODEL(p,GLUE),
                       SYNCTEX_LINE_MODEL(p,GLUE),
@@ -1157,6 +1217,8 @@ synctex_record_node_kern(int32_t p)
 static inline void
 synctex_record_node_rule(int32_t p)
 {
+    if (!synctex_ctxt.file)
+        return;
     int len = ttstub_fprintf(synctex_ctxt.file, "r%i,%i:%i,%i:%i,%i,%i\n",
                       SYNCTEX_TAG_MODEL(p,RULE),
                       SYNCTEX_LINE_MODEL(p,RULE),
@@ -1178,6 +1240,8 @@ synctex_record_node_rule(int32_t p)
 static void
 synctex_record_node_math(int32_t p)
 {
+    if (!synctex_ctxt.file)
+        return;
     int len = ttstub_fprintf(synctex_ctxt.file, "$%i,%i:%i,%i\n",
                       SYNCTEX_TAG_MODEL(p,MATH),
                       SYNCTEX_LINE_MODEL(p,MATH),

@@ -176,6 +176,10 @@ enum Commands {
     /// Run a standalone (La)TeX compilation
     Compile(crate::compile::CompileOptions),
 
+    #[structopt(name = "texpresso")]
+    /// Run a (La)TeX compilation connected to a TeXpresso server
+    Texpresso(crate::compile::CompileOptions),
+
     #[structopt(name = "dump")]
     /// Run a partial compilation and output an intermediate file
     Dump(DumpCommand),
@@ -207,6 +211,7 @@ impl Commands {
             Commands::Build(o) => o.customize(cc),
             Commands::Bundle(o) => o.customize(cc),
             Commands::Compile(_) => {} // avoid namespacing/etc issues
+            Commands::Texpresso(_) => {} // avoid namespacing/etc issues
             Commands::Dump(o) => o.customize(cc),
             Commands::New(o) => o.customize(cc),
             Commands::Init(o) => o.customize(cc),
@@ -225,7 +230,8 @@ impl Commands {
         match self {
             Commands::Build(o) => o.execute(config, status, web_bundle),
             Commands::Bundle(o) => o.execute(config, status),
-            Commands::Compile(o) => o.execute(config, status, web_bundle),
+            Commands::Compile(o) => o.execute(config, status, false, web_bundle),
+            Commands::Texpresso(o) => o.execute(config, status, true, web_bundle),
             Commands::Dump(o) => o.execute(config, status),
             Commands::New(o) => o.execute(config, status, web_bundle),
             Commands::Init(o) => o.execute(config, status, web_bundle),
