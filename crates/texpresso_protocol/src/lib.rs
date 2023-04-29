@@ -241,21 +241,21 @@ impl ClientIO {
         match self.recv_u32() {
             0 => return AccessResult::Pass,
             1 => {
-                stat.st_dev = i32::from_le_bytes(self.recv4());
-                stat.st_ino = self.recv_u32() as u64;
-                stat.st_mode = self.recv_u32() as u16;
-                stat.st_nlink = self.recv_u32() as u16;
-                stat.st_uid = self.recv_u32();
-                stat.st_gid = self.recv_u32();
-                stat.st_rdev = i32::from_le_bytes(self.recv4());
-                stat.st_size = self.recv_u32() as i64;
-                stat.st_blksize = i32::from_le_bytes(self.recv4());
-                stat.st_blocks = self.recv_u32() as i64;
-                stat.st_atime = self.recv_u32() as i64;
+                stat.st_dev = self.recv_i32() as libc::dev_t;
+                stat.st_ino = self.recv_u32() as libc::ino_t;
+                stat.st_mode = self.recv_u32() as libc::mode_t;
+                stat.st_nlink = self.recv_u32() as libc::nlink_t;
+                stat.st_uid = self.recv_u32() as libc::uid_t;
+                stat.st_gid = self.recv_u32() as libc::gid_t;
+                stat.st_rdev = self.recv_i32() as libc::dev_t;
+                stat.st_size = self.recv_u32() as libc::off_t;
+                stat.st_blksize = self.recv_i32() as libc::blksize_t;
+                stat.st_blocks = self.recv_u32() as libc::blkcnt_t;
+                stat.st_atime = self.recv_u32() as libc::time_t;
                 stat.st_atime_nsec = self.recv_u32() as i64;
-                stat.st_ctime = self.recv_u32() as i64;
+                stat.st_ctime = self.recv_u32() as libc::time_t;
                 stat.st_ctime_nsec = self.recv_u32() as i64;
-                stat.st_mtime = self.recv_u32() as i64;
+                stat.st_mtime = self.recv_u32() as libc::time_t;
                 stat.st_mtime_nsec = self.recv_u32() as i64;
                 return AccessResult::Ok;
             }
