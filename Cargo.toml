@@ -27,6 +27,10 @@ license = "MIT"
 edition = "2018"
 exclude = ["/dist/", "/reference_sources/"]
 
+[[bin]]
+name = "texpresso-tonic"
+path = "src/bin/tectonic/main.rs"
+
 [badges]
 travis-ci = { repository = "tectonic-typesetting/tectonic" }
 codecov = { repository = "tectonic-typesetting/tectonic", service = "github" }
