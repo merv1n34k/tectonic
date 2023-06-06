@@ -125,8 +125,6 @@ impl CompileOptions {
             .format_cache_path(config.format_cache_path()?)
             .synctex(self.synctex);
 
-        sess_builder.output_format(OutputFormat::from_str(&self.outfmt).unwrap());
-
         let pass = PassSetting::from_str(&self.pass).unwrap();
         sess_builder.pass(pass);
 
@@ -143,12 +141,13 @@ impl CompileOptions {
         let input_path = self.input;
 
         let texpresso = if texpresso {
+            sess_builder.output_format(OutputFormat::Xdv);
+            sess_builder.pass(PassSetting::Tex);
             let ref input_path = if input_path == "-" { "texput.tex" } else { &input_path };
             TexpressoIO::new_from_env(&input_path)
-        } else { None };
-
-        if texpresso.is_some() {
-            sess_builder.pass(PassSetting::Tex);
+        } else {
+            sess_builder.output_format(OutputFormat::from_str(&self.outfmt).unwrap());
+            None
         };
 
         let mut texpresso_status = match texpresso {
