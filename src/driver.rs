@@ -445,10 +445,6 @@ macro_rules! bridgestate_ioprovider_try {
 
 macro_rules! bridgestate_ioprovider_cascade {
     ($self:ident, $($inner:tt)+) => {
-        if let Some(ref mut texpresso) = $self.texpresso {
-            bridgestate_ioprovider_try!(texpresso, $($inner)+);
-        }
-
         if let Some(ref mut p) = $self.genuine_stdout {
             bridgestate_ioprovider_try!(p, $($inner)+);
         }
@@ -459,6 +455,9 @@ macro_rules! bridgestate_ioprovider_cascade {
             bridgestate_ioprovider_try!(p, $($inner)+);
             false
         } else {
+            if let Some(ref mut texpresso) = $self.texpresso {
+                bridgestate_ioprovider_try!(texpresso, $($inner)+);
+            }
             bridgestate_ioprovider_try!($self.primary_input, $($inner)+);
             true
         };
