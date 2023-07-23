@@ -32,10 +32,13 @@ fn write_or_panic(file: &mut File, data: &[u8]) -> () {
     match file.write(data) {
         Ok(n) => {
             if n != data.len() {
-                panic!("Texpresso: wrote only {n} bytes out of {}", data.len());
+                panic!("TeXpresso: wrote only {n} bytes out of {}", data.len());
             }
         }
-        Err(error) => panic!("Texpresso: cannot write to server ({error})"),
+        Err(error) => {
+            eprintln!("TeXpresso: cannot write to server ({error})");
+            std::process::exit(1)
+        }
     }
 }
 
@@ -85,8 +88,13 @@ impl ClientIO {
     fn recv4(&mut self) -> [u8; 4] {
         let mut result = [0; 4];
         self.flush();
-        self.file.read_exact(&mut result).unwrap();
-        result
+        match self.file.read_exact(&mut result) {
+            Ok(()) => result,
+            Err(error) => {
+                eprintln!("TeXpresso: cannot read from server ({error})");
+                std::process::exit(1)
+            }
+        }
     }
 
     fn recv_u32(&mut self) -> u32 {
@@ -115,7 +123,7 @@ impl ClientIO {
     fn check_done(&mut self) -> () {
         match &self.recv_tag() {
             b"DONE" => (),
-            _ => panic!(),
+            tag => panic!("TeXpresso: unexpected tag {:?}", tag),
         }
     }
 
@@ -127,7 +135,7 @@ impl ClientIO {
         match &self.recv_tag() {
             b"DONE" => return true,
             b"PASS" => return false,
-            _ => panic!(),
+            tag => panic!("TeXpresso: unexpected tag {:?}", tag),
         };
     }
 
@@ -147,7 +155,7 @@ impl ClientIO {
                 self.file.read_exact(&mut buf[..rd_size]).unwrap();
                 return Some(rd_size);
             }
-            _ => panic!(),
+            tag => panic!("TeXpresso: unexpected tag {:?}", tag),
         };
     }
 
@@ -173,7 +181,7 @@ impl ClientIO {
         self.send4(file.to_le_bytes());
         match &self.recv_tag() {
             b"SIZE" => return self.recv_u32(),
-            _ => panic!(),
+            tag => panic!("TeXpresso: unexpected tag {:?}", tag),
         }
     }
 
@@ -197,7 +205,7 @@ impl ClientIO {
         match &self.recv_tag() {
             b"DONE" => return true,
             b"PASS" => return false,
-            _ => panic!(),
+            tag => panic!("TeXpresso: unexpected tag {:?}", tag),
         }
     }
 
@@ -225,7 +233,7 @@ impl ClientIO {
                 3 => return AccessResult::EAccess,
                 _ => panic!(),
             },
-            _ => panic!(),
+            tag => panic!("TeXpresso: unexpected tag {:?}", tag),
         }
     }
 
@@ -235,7 +243,7 @@ impl ClientIO {
 
         match &self.recv_tag() {
             b"STAT" => (),
-            _ => panic!(),
+            tag => panic!("TeXpresso: unexpected tag {:?}", tag),
         };
 
         match self.recv_u32() {
