@@ -499,6 +499,7 @@ impl BundleServeCommand {
         let stdin = std::io::stdin();
         let mut stdout = std::io::stdout();
         loop {
+            filename.clear();
             match stdin.read_line(&mut filename) {
                 | Err(error) => {
                     eprintln!("error: {error}");
@@ -528,6 +529,7 @@ impl BundleServeCommand {
                     }
                 }
             };
+            stdout.flush().unwrap();
         }
     }
 }
