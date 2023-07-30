@@ -356,4 +356,27 @@ impl IoProvider for TexpressoIO {
     fn input_open_primary(&mut self, status: &mut dyn StatusBackend) -> OpenResult<InputHandle> {
         self.input_open_name(&self.primary.clone(), status)
     }
+
+    fn input_open_primary_with_abspath(
+        &mut self,
+        status: &mut dyn StatusBackend,
+    ) -> OpenResult<(InputHandle, Option<std::path::PathBuf>)> {
+        match self.input_open_primary(status) {
+            OpenResult::Ok(ih) => OpenResult::Ok((ih, Some(self.primary.clone().into()))),
+            OpenResult::Err(x) => OpenResult::Err(x),
+            OpenResult::NotAvailable => OpenResult::NotAvailable,
+        }
+    }
+
+    fn input_open_name_with_abspath(
+        &mut self,
+        name: &str,
+        status: &mut dyn StatusBackend,
+    ) -> OpenResult<(InputHandle, Option<std::path::PathBuf>)> {
+        match self.input_open_name(name, status) {
+            OpenResult::Ok(ih) => OpenResult::Ok((ih, Some(name.into()))),
+            OpenResult::Err(x) => OpenResult::Err(x),
+            OpenResult::NotAvailable => OpenResult::NotAvailable,
+        }
+    }
 }
