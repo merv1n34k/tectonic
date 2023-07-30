@@ -129,12 +129,6 @@ static struct {
 };
 
 
-static void isync_now(void)
-{
-  if (synctex_ctxt.flags.isync)
-    isync_output(synctex_ctxt.tag, synctex_ctxt.line);
-}
-
 static char *
 get_current_name (void)
 {
