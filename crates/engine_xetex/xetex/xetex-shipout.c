@@ -44,10 +44,6 @@ static void dvi_two(UTF16_code s);
 static void dvi_pop(int32_t l);
 static void dvi_font_def(internal_font_number f);
 
-/* EXTENSION: Inline "SyncTex" information */
-static void isync_init(void);
-static void isync_begin_page(void);
-//static void isync_output(int input, int line);
 
 void
 initialize_shipout_variables(void)
@@ -61,8 +57,8 @@ initialize_shipout_variables(void)
     down_ptr = TEX_NULL;
     right_ptr = TEX_NULL;
     cur_s = -1;
-    isync_init();
 }
+
 
 void
 deinitialize_shipout_variables(void)
@@ -92,7 +88,6 @@ ship_out(int32_t p)
     unsigned char l;
     const char *output_comment = "tectonic";
 
-    isync_begin_page();
     synctex_sheet(INTPAR(mag));
 
     if (job_name == 0)
@@ -2475,115 +2470,4 @@ dvi_pop(int32_t l)
         dvi_ptr--;
     else
         dvi_out(POP);
-}
-
-/* EXTENSION: Inline "SyncTex" information */
-
-static int isync_cur_input = 0, isync_cur_line = 0, isync_reg_input = 0,
-           isync_pre_input = 0, isync_pre_line = 0;
-
-static void isync_begin_page(void)
-{
-    isync_cur_input = -1;
-    isync_cur_line = 0;
-    isync_pre_input = -1;
-    isync_pre_line = 0;
-}
-
-static void isync_init(void)
-{
-    isync_reg_input = 0;
-    isync_begin_page();
-}
-
-static void isync_record_input(int input, const char *path)
-{
-  if (!path) return;
-
-  char buffer[100];
-  dvi_out(XXX1);
-  int hlen = sprintf(buffer, "Input:%d:", isync_reg_input);
-  int plen = strlen(path);
-  dvi_out(hlen + plen);
-  for (int i = 0; i < hlen; ++i)
-    dvi_out(buffer[i]);
-  for (int i = 0; i < plen; ++i)
-    dvi_out(path[i]);
-}
-
-void isync_output(int input, int line)
-{
-  char buffer[100];
-  if (input != isync_cur_input)
-  {
-    for (; isync_reg_input <= input; isync_reg_input += 1)
-        isync_record_input(input, synctex_get_input(input));
-
-    int pre_input = isync_pre_input;
-    int pre_line = isync_pre_line;
-    isync_pre_input = isync_cur_input;
-    isync_pre_line = isync_cur_line;
-
-    dvi_out(XXX1);
-    if (input != pre_input)
-    {
-      int len = sprintf(buffer, "I %d %d", input, line);
-      dvi_out(len);
-      for (int i = 0; i < len; ++i)
-        dvi_out(buffer[i]);
-    }
-    else if (line == pre_line)
-    {
-      dvi_out(1);
-      dvi_out('p');
-    }
-    else if (line == pre_line + 1)
-    {
-      dvi_out(1);
-      dvi_out('P');
-    }
-    else if (line > pre_line && line < pre_line + 10)
-    {
-      dvi_out(2);
-      dvi_out('P');
-      dvi_out('0' + line - pre_line);
-    }
-    else
-    {
-      int len = sprintf(buffer, "P %d", line);
-      dvi_out(len);
-      for (int i = 0; i < len; ++i)
-        dvi_out(buffer[i]);
-    }
-    isync_cur_input = input;
-    isync_cur_line = line;
-  }
-  else if (line != isync_cur_line)
-  {
-    dvi_out(XXX1);
-    if (line == isync_cur_line + 1)
-    {
-      dvi_out(1);
-      dvi_out('l');
-    }
-    else if (line == isync_cur_line + 2)
-    {
-      dvi_out(1);
-      dvi_out('L');
-    }
-    else if (line > isync_cur_line && line < isync_cur_line + 10)
-    {
-      dvi_out(2);
-      dvi_out('L');
-      dvi_out('0' + line - isync_cur_line);
-    }
-    else
-    {
-        int len = sprintf(buffer, "L %d", line);
-        dvi_out(len);
-        for (int i = 0; i < len; ++i)
-          dvi_out(buffer[i]);
-    }
-    isync_cur_line = line;
-  }
 }

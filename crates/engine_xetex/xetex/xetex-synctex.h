@@ -120,17 +120,4 @@ void synctex_pdfrefxform(int objnum);
 /*  For debugging purpose only    */
 void synctex_current(void);
 
-/* in XeTeX, "halfword" fields are at least 32 bits, so we'll use those for
- * tag and line so that the sync field size is only one memory_word. */
-
-#define SYNCTEX_TAG_MODEL(NODE,TYPE) mem[NODE + TYPE##_NODE_SIZE - SYNCTEX_FIELD_SIZE].b32.s0
-#define SYNCTEX_LINE_MODEL(NODE,TYPE) mem[NODE + TYPE##_NODE_SIZE - SYNCTEX_FIELD_SIZE].b32.s1
-
-#define GLUE_NODE_SIZE MEDIUM_NODE_SIZE
-#define KERN_NODE_SIZE MEDIUM_NODE_SIZE
-#define MATH_NODE_SIZE MEDIUM_NODE_SIZE
-
-const char *synctex_get_input(unsigned tag);
-void isync_output(int input, int line);
-
 #  endif
