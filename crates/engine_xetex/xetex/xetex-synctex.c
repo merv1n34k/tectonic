@@ -106,8 +106,6 @@ static struct {
         unsigned int not_void:1;    /*  Whether it really contains synchronization material */
         unsigned int warn:1;        /*  One shot warning flag */
         unsigned int output_p:1;    /*  Whether the output_directory is used */
-        unsigned int record:1;      /*  Record even if file is not open */
-        unsigned int isync:1;       /*  Inline SyncTeX information */
     } flags;
 } synctex_ctxt = {
     NULL, /* file */
@@ -166,7 +164,6 @@ synctex_init_command(void)
     synctex_ctxt.flags.not_void = 0;
     synctex_ctxt.flags.warn = 0;
     synctex_ctxt.flags.output_p = 0;
-    synctex_ctxt.flags.isync = 1;
 
     if (synctex_enabled) {
         INTPAR(synctex) = 1;
@@ -231,15 +228,8 @@ synctex_dot_open(void)
     char *tmp = NULL, *the_name = NULL;
     size_t len;
 
-    if (synctex_ctxt.flags.off || !INTPAR(synctex) || synctex_ctxt.flags.isync)
-    {
-        if (!synctex_ctxt.flags.record)
-        {
-            synctex_record_input(1, synctex_ctxt.root_name);
-            synctex_ctxt.flags.record = 1;
-        }
+    if (synctex_ctxt.flags.off || !INTPAR(synctex))
         return NULL;
-    }
 
     if (synctex_ctxt.file)
         return synctex_ctxt.file;
@@ -279,7 +269,6 @@ synctex_dot_open(void)
     }
 
     synctex_ctxt.count = 0;
-    synctex_ctxt.flags.record = 1;
     return synctex_ctxt.file;
 
 fail:
@@ -309,8 +298,7 @@ synctex_prepare_content(void)
         return synctex_ctxt.file;
     }
 
-    if (!synctex_ctxt.flags.isync)
-      synctexabort();
+    synctexabort();
     return NULL;
 }
 
@@ -452,7 +440,7 @@ void synctex_teehs(void)
  *  a change in the context, this is the macro SYNCTEX_???_CONTEXT_DID_CHANGE. The
  *  SYNCTEX_IGNORE macro is used to detect unproperly initialized nodes.  See
  *  details in the implementation of the functions below.  */
-#   define SYNCTEX_IGNORE(NODE) synctex_ctxt.flags.off || !INTPAR(synctex) || !synctex_ctxt.flags.record
+#   define SYNCTEX_IGNORE(NODE) synctex_ctxt.flags.off || !INTPAR(synctex) || !synctex_ctxt.file
 
 
 /*  This message is sent when a vlist will be shipped out, more precisely at
