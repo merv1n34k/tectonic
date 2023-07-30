@@ -228,6 +228,8 @@ synctex_dot_open(void)
     char *tmp = NULL, *the_name = NULL;
     size_t len;
 
+    int is_gz = 0;
+
     if (synctex_ctxt.flags.off || !INTPAR(synctex))
         return NULL;
 
@@ -241,16 +243,17 @@ synctex_dot_open(void)
         /*printf("\nSyncTeX information: no synchronization with keyboard input\n");*/
         goto fail;
 
-    the_name = xmalloc(len
-                            + strlen(synctex_suffix)
-                            + strlen(synctex_suffix_gz)
-                            + 1);
+    the_name = xmalloc(len +
+                       strlen(synctex_suffix) +
+                       (is_gz ? strlen(synctex_suffix_gz) : 0) +
+                       1);
     strcpy(the_name, tmp);
     strcat(the_name, synctex_suffix);
-    strcat(the_name, synctex_suffix_gz);
+    if (is_gz)
+        strcat(the_name, synctex_suffix_gz);
     tmp = mfree(tmp);
 
-    synctex_ctxt.file = ttstub_output_open(the_name, 1);
+    synctex_ctxt.file = ttstub_output_open(the_name, is_gz);
     if (synctex_ctxt.file == NULL)
         goto fail;
 
