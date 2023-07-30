@@ -737,7 +737,7 @@ synctex_record_settings(void)
 {
     int len;
 
-    if (!synctex_ctxt.file)
+    if (NULL == synctex_ctxt.file)
         return 0;
 
     len = ttstub_fprintf(synctex_ctxt.file, "Output:pdf\nMagnification:%i\nUnit:%i\nX Offset:0\nY Offset:0\n",
@@ -756,9 +756,6 @@ synctex_record_settings(void)
 static inline int
 synctex_record_preamble(void)
 {
-    if (!synctex_ctxt.file)
-        return 0;
-
     int len = ttstub_fprintf(synctex_ctxt.file, "SyncTeX Version:%i\n", SYNCTEX_VERSION);
 
     if (len > 0) {
@@ -787,9 +784,6 @@ synctex_record_input(int32_t tag, char *name)
 static inline int
 synctex_record_anchor(void)
 {
-    if (!synctex_ctxt.file)
-        return 0;
-
     int len = ttstub_fprintf(synctex_ctxt.file, "!%i\n", synctex_ctxt.total_length);
 
     if (len > 0) {
@@ -805,9 +799,6 @@ synctex_record_anchor(void)
 static inline int
 synctex_record_content(void)
 {
-    if (!synctex_ctxt.file)
-        return 0;
-
     int len = ttstub_fprintf(synctex_ctxt.file, "Content:\n");
 
     if (len > 0) {
@@ -822,9 +813,6 @@ synctex_record_content(void)
 static inline int
 synctex_record_sheet(int32_t sheet)
 {
-    if (!synctex_ctxt.file)
-        return 0;
-
     if (0 == synctex_record_anchor()) {
         int len = ttstub_fprintf(synctex_ctxt.file, "{%i\n", sheet);
         SYNCTEX_RECORD_LEN_AND_RETURN_NOERR;
@@ -839,9 +827,6 @@ synctex_record_sheet(int32_t sheet)
 static inline int
 synctex_record_teehs(int32_t sheet)
 {
-    if (!synctex_ctxt.file)
-        return 0;
-
     if (0 == synctex_record_anchor()) {
         int len = ttstub_fprintf(synctex_ctxt.file, "}%i\n", sheet);
         SYNCTEX_RECORD_LEN_AND_RETURN_NOERR;
@@ -895,6 +880,7 @@ synctex_pdfrefxform(int objnum)
 static inline int
 synctex_record_pdfxform(int32_t form)
 {
+
     if (SYNCTEX_IGNORE(nothing)) {
         return 0;
     } else {
@@ -914,8 +900,6 @@ synctex_record_pdfxform(int32_t form)
 static inline int
 synctex_record_mrofxfdp(void)
 {
-    if (!synctex_ctxt.file)
-        return 0;
     if (0 == synctex_record_anchor()) {
         int len;
         /* XXX Tectonic: mistake here in original source, no %d in format string */
@@ -955,9 +939,6 @@ synctex_record_node_pdfrefxform(int objnum) /* UNUSED form JL */
 static inline void
 synctex_record_node_void_vlist(int32_t p)
 {
-    if (!synctex_ctxt.file)
-        return;
-
     int len = ttstub_fprintf(synctex_ctxt.file, "v%i,%i:%i,%i:%i,%i,%i\n",
                       SYNCTEX_TAG_MODEL(p,BOX),
                       SYNCTEX_LINE_MODEL(p,BOX),
@@ -979,9 +960,6 @@ synctex_record_node_void_vlist(int32_t p)
 static inline void
 synctex_record_node_vlist(int32_t p)
 {
-    if (!synctex_ctxt.file)
-        return;
-
     int len;
 
     synctex_ctxt.flags.not_void = 1;
@@ -1007,9 +985,6 @@ synctex_record_node_vlist(int32_t p)
 static inline void
 synctex_record_node_tsilv(int32_t p __attribute__ ((unused)))
 {
-    if (!synctex_ctxt.file)
-        return;
-
     int len = ttstub_fprintf(synctex_ctxt.file, "]\n");
 
     if (len > 0) {
@@ -1023,8 +998,6 @@ synctex_record_node_tsilv(int32_t p __attribute__ ((unused)))
 static inline void
 synctex_record_node_void_hlist(int32_t p)
 {
-    if (!synctex_ctxt.file)
-        return;
     int len = ttstub_fprintf(synctex_ctxt.file, "h%i,%i:%i,%i:%i,%i,%i\n",
                       SYNCTEX_TAG_MODEL(p,BOX),
                       SYNCTEX_LINE_MODEL(p,BOX),
@@ -1046,8 +1019,6 @@ synctex_record_node_void_hlist(int32_t p)
 static inline void
 synctex_record_node_hlist(int32_t p)
 {
-    if (!synctex_ctxt.file)
-        return;
     int len;
 
     synctex_ctxt.flags.not_void = 1;
@@ -1073,8 +1044,6 @@ synctex_record_node_hlist(int32_t p)
 static inline void
 synctex_record_node_tsilh(int32_t p __attribute__ ((unused)))
 {
-    if (!synctex_ctxt.file)
-        return;
     int len = ttstub_fprintf(synctex_ctxt.file, ")\n");
 
     if (len > 0) {
@@ -1088,8 +1057,6 @@ synctex_record_node_tsilh(int32_t p __attribute__ ((unused)))
 static inline int
 synctex_record_count(void)
 {
-    if (!synctex_ctxt.file)
-        return 0;
     int len = ttstub_fprintf(synctex_ctxt.file, "Count:%i\n", synctex_ctxt.count);
 
     if (len > 0) {
@@ -1104,8 +1071,6 @@ synctex_record_count(void)
 static inline int
 synctex_record_postamble(void)
 {
-    if (!synctex_ctxt.file)
-        return 0;
     if (0 == synctex_record_anchor()) {
         int len = ttstub_fprintf(synctex_ctxt.file, "Postamble:\n");
         if (len > 0) {
@@ -1127,8 +1092,6 @@ synctex_record_postamble(void)
 static inline void
 synctex_record_node_glue(int32_t p)
 {
-    if (!synctex_ctxt.file)
-        return;
     int len = ttstub_fprintf(synctex_ctxt.file, "g%i,%i:%i,%i\n",
                       SYNCTEX_TAG_MODEL(p,GLUE),
                       SYNCTEX_LINE_MODEL(p,GLUE),
@@ -1147,8 +1110,6 @@ synctex_record_node_glue(int32_t p)
 static inline void
 synctex_record_node_kern(int32_t p)
 {
-    if (!synctex_ctxt.file)
-        return;
     int len = ttstub_fprintf(synctex_ctxt.file, "k%i,%i:%i,%i:%i\n",
                       SYNCTEX_TAG_MODEL(p,GLUE),
                       SYNCTEX_LINE_MODEL(p,GLUE),
@@ -1168,8 +1129,6 @@ synctex_record_node_kern(int32_t p)
 static inline void
 synctex_record_node_rule(int32_t p)
 {
-    if (!synctex_ctxt.file)
-        return;
     int len = ttstub_fprintf(synctex_ctxt.file, "r%i,%i:%i,%i:%i,%i,%i\n",
                       SYNCTEX_TAG_MODEL(p,RULE),
                       SYNCTEX_LINE_MODEL(p,RULE),
@@ -1191,8 +1150,6 @@ synctex_record_node_rule(int32_t p)
 static void
 synctex_record_node_math(int32_t p)
 {
-    if (!synctex_ctxt.file)
-        return;
     int len = ttstub_fprintf(synctex_ctxt.file, "$%i,%i:%i,%i\n",
                       SYNCTEX_TAG_MODEL(p,MATH),
                       SYNCTEX_LINE_MODEL(p,MATH),
