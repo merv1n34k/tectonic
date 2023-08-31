@@ -1910,7 +1910,9 @@ impl ProcessingSession {
                 return Err(e.into()),
         };
 
-        if !self.bs.mem.files.borrow().contains_key(&self.tex_xdv_path) {
+        if !self.bs.mem.files.borrow().contains_key(&self.tex_xdv_path) &&
+            self.bs.texpresso.is_none()
+        {
             // TeX did not produce the expected output file
             tt_warning!(
                 status,
