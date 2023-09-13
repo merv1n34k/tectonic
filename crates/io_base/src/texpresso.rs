@@ -115,6 +115,7 @@ impl io::Read for TexpressoReader {
                     None => {
                         io.client.flush();
                         io.gen += 1;
+                        tectonic_geturl::reqwest::clear_shared_client();
                         let child = unsafe { io.client.fork() };
                         if child == 0 {
                             io.client.child(unsafe{libc::getpid()})

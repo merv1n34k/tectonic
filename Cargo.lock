@@ -2551,6 +2551,7 @@ dependencies = [
  "libc",
  "sha2",
  "tectonic_errors",
+ "tectonic_geturl",
  "tectonic_status_base",
  "texpresso_protocol",
  "thiserror",

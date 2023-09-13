@@ -23,6 +23,7 @@ sha2 = "^0.10" # for digest computations
 thiserror = "1.0"
 tectonic_errors = { path = "../errors", version =">=0.1.0,<1"}
 tectonic_status_base = { path = "../status_base", version =">=0.1.0,<1"}
+tectonic_geturl = { path = "../geturl", version =">=0.3.0,<1" }
 texpresso_protocol = { path = "../texpresso_protocol", version = "0.1.0" }
 
 [package.metadata.internal_dep_versions]

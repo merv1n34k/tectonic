@@ -11,10 +11,36 @@ use reqwest::{
 };
 use tectonic_errors::{anyhow::bail, Result};
 use tectonic_status_base::{tt_note, StatusBackend};
+use std::cell::RefCell;
 
 use crate::{GetUrlBackend, RangeReader};
 
 const MAX_HTTP_REDIRECTS_ALLOWED: usize = 10;
+
+thread_local!(static SHARED_CLIENT: RefCell<Option<Client>> = RefCell::new(None));
+
+fn get_shared_client() -> Client {
+    SHARED_CLIENT.with(|rclient| {
+        let mut oclient = rclient.borrow_mut();
+        match oclient.to_owned() {
+            Some(client) => client,
+            None => {
+                let client = Client::new();
+                *oclient = Some(client.clone());
+                client
+            }
+        }
+    })
+}
+
+/// Drop the shared client.
+/// It maintains a connection pool that causes problem when forking.
+pub fn clear_shared_client() {
+    SHARED_CLIENT.with(|rclient| {
+        let mut oclient = rclient.borrow_mut();
+        *oclient = None
+    })
+}
 
 /// URL-get backend implemented using the `reqwest` crate.
 #[derive(Debug, Default)]
@@ -25,7 +51,7 @@ impl GetUrlBackend for ReqwestBackend {
     type RangeReader = ReqwestRangeReader;
 
     fn get_url(&mut self, url: &str, _status: &mut dyn StatusBackend) -> Result<Response> {
-        let res = Client::new().get(url).send()?;
+        let res = get_shared_client().get(url).send()?;
         if !res.status().is_success() {
             bail!(
                 "unexpected HTTP response code {} for URL {}",
@@ -114,14 +140,14 @@ impl GetUrlBackend for ReqwestBackend {
 #[derive(Debug)]
 pub struct ReqwestRangeReader {
     url: String,
-    client: Client,
+    //client: Rc<Client>,
 }
 
 impl ReqwestRangeReader {
     fn new(url: &str) -> ReqwestRangeReader {
         ReqwestRangeReader {
             url: url.to_owned(),
-            client: Client::new(),
+            //client: Rc::new(Client::new()),
         }
     }
 }
@@ -136,7 +162,8 @@ impl RangeReader for ReqwestRangeReader {
         let mut headers = HeaderMap::new();
         headers.insert(RANGE, header_val);
 
-        let res = self.client.get(&self.url).headers(headers).send()?;
+        let client = get_shared_client();
+        let res = client.get(&self.url).headers(headers).send()?;
 
         if res.status() != StatusCode::PARTIAL_CONTENT {
             bail!(
