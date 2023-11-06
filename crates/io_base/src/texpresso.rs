@@ -39,7 +39,6 @@ impl TexpressoIO {
         }
     }
 
-
     /// TODO
     pub unsafe fn client_from_env() -> Option<txp::Client> {
         match env::var("TEXPRESSO_FD") {
@@ -292,14 +291,16 @@ impl IoProvider for TexpressoIO {
             let mut io = self.borrow_mut();
             let id = io.alloc_id();
             let open = io.client.open(id, name, "w");
-            if !open { io.release_id(id); };
+            if open.is_none() { io.release_id(id); };
             io.last_passed_open = "".to_string();
             (id, open)
         };
-        if open {
-            OpenResult::Ok(OutputHandle::new_without_digest(name, TexpressoWriter{io: self.state.clone(), id, pos: 0}))
-        } else {
-            OpenResult::NotAvailable
+        match open {
+            None => OpenResult::NotAvailable,
+            Some(path) => {
+                let writer = TexpressoWriter{io: self.state.clone(), id, pos: 0};
+                OpenResult::Ok(OutputHandle::new_without_digest(path, writer))
+            }
         }
     }
 
@@ -322,27 +323,28 @@ impl IoProvider for TexpressoIO {
             };
             let id = io.alloc_id();
             let open = io.client.open(id, name, "r?");
-            if open {
-                io.last_passed_open = "".to_string();
-            } else {
+            if open.is_none() {
                 io.last_passed_open = name.to_string();
                 io.release_id(id);
-            }
+            } else {
+                io.last_passed_open = "".to_string();
+            };
             (id, open, io.gen)
         };
-        if open {
-            let reader = TexpressoReader {
-                io: self.state.clone(),
-                id, gen,
-                abs_pos: 0,
-                buf: [0; 1024],
-                buf_pos: 0,
-                buf_len: 0,
-                size: None,
-            };
-            OpenResult::Ok(InputHandle::new_read_only(name, reader, InputOrigin::Other))
-        } else {
-            OpenResult::NotAvailable
+        match open {
+            | None => OpenResult::NotAvailable,
+            | Some(path) => {
+                let reader = TexpressoReader {
+                    io: self.state.clone(),
+                    id, gen,
+                    abs_pos: 0,
+                    buf: [0; 1024],
+                    buf_pos: 0,
+                    buf_len: 0,
+                    size: None,
+                };
+                OpenResult::Ok(InputHandle::new_read_only(path, reader, InputOrigin::Other))
+            }
         }
     }
 

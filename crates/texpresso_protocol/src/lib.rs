@@ -1,5 +1,4 @@
 use cpu_time::ProcessTime;
-use libc;
 use std::{
     fs::File,
     io::{Read, Write},
@@ -28,7 +27,7 @@ pub struct Client {
     write_len: u32,
 }
 
-fn write_or_panic(file: &mut File, data: &[u8]) -> () {
+fn write_or_panic(file: &mut File, data: &[u8]) {
     match file.write(data) {
         Ok(n) => {
             if n != data.len() {
@@ -66,16 +65,16 @@ impl ClientIO {
         }
     }
 
-    fn send_str(&mut self, text: &str) -> () {
+    fn send_str(&mut self, text: &str) {
         write_or_panic(&mut self.file, text.as_bytes());
         write_or_panic(&mut self.file, b"\x00");
     }
 
-    fn send4(&mut self, data: [u8; 4]) -> () {
+    fn send4(&mut self, data: [u8; 4]) {
         write_or_panic(&mut self.file, &data)
     }
 
-    fn send_tag(&mut self, tag: [u8; 4]) -> () {
+    fn send_tag(&mut self, tag: [u8; 4]) {
         self.send4(tag);
         let time = self.delta + ProcessTime::elapsed(&self.start_time);
         self.send4((time.as_millis() as u32).to_le_bytes());
@@ -120,23 +119,28 @@ impl ClientIO {
         }
     }
 
-    fn check_done(&mut self) -> () {
+    fn check_done(&mut self) {
         match &self.recv_tag() {
             b"DONE" => (),
             tag => panic!("TeXpresso: unexpected tag {:?}", tag),
         }
     }
 
-    fn open(&mut self, file: FileId, path: &str, mode: &str) -> bool {
+    fn open(&mut self, file: FileId, path: &str, mode: &str) -> Option<String> {
         self.send_tag(*b"OPEN");
         self.send4(file.to_le_bytes());
         self.send_str(path);
         self.send_str(mode);
         match &self.recv_tag() {
-            b"DONE" => return true,
-            b"PASS" => return false,
+            b"PASS" => None,
+            b"OPEN" => {
+                let size = self.recv_u32() as usize;
+                let mut buf = vec![0u8; size];
+                self.file.read_exact(&mut buf).unwrap();
+                Some(String::from_utf8(buf).unwrap())
+            },
             tag => panic!("TeXpresso: unexpected tag {:?}", tag),
-        };
+        }
     }
 
     fn read(&mut self, file: FileId, pos: u32, buf: &mut [u8]) -> Option<usize> {
@@ -146,17 +150,17 @@ impl ClientIO {
         self.send4((buf.len() as u32).to_le_bytes());
 
         match &self.recv_tag() {
-            b"FORK" => return None,
+            b"FORK" => None,
             b"READ" => {
                 let rd_size = self.recv_u32() as usize;
                 if rd_size > buf.len() {
                     panic!()
                 };
                 self.file.read_exact(&mut buf[..rd_size]).unwrap();
-                return Some(rd_size);
+                Some(rd_size)
             }
             tag => panic!("TeXpresso: unexpected tag {:?}", tag),
-        };
+        }
     }
 
     fn write(&mut self, file: FileId, pos: u32, b1: &[u8], b2: &[u8]) {
@@ -170,7 +174,7 @@ impl ClientIO {
         self.check_done();
     }
 
-    fn close(&mut self, file: FileId) -> () {
+    fn close(&mut self, file: FileId) {
         self.send_tag(*b"CLOS");
         self.send4(file.to_le_bytes());
         self.check_done();
@@ -180,7 +184,7 @@ impl ClientIO {
         self.send_tag(*b"SIZE");
         self.send4(file.to_le_bytes());
         match &self.recv_tag() {
-            b"SIZE" => return self.recv_u32(),
+            b"SIZE" => self.recv_u32(),
             tag => panic!("TeXpresso: unexpected tag {:?}", tag),
         }
     }
@@ -203,8 +207,8 @@ impl ClientIO {
         self.send4(child.to_le_bytes());
         self.send4(exitcode.to_le_bytes());
         match &self.recv_tag() {
-            b"DONE" => return true,
-            b"PASS" => return false,
+            b"DONE" => true,
+            b"PASS" => false,
             tag => panic!("TeXpresso: unexpected tag {:?}", tag),
         }
     }
@@ -227,10 +231,10 @@ impl ClientIO {
 
         match &self.recv_tag() {
             b"ACCS" => match self.recv_u32() {
-                0 => return AccessResult::Pass,
-                1 => return AccessResult::Ok,
-                2 => return AccessResult::ENoEnt,
-                3 => return AccessResult::EAccess,
+                0 => AccessResult::Pass,
+                1 => AccessResult::Ok,
+                2 => AccessResult::ENoEnt,
+                3 => AccessResult::EAccess,
                 _ => panic!(),
             },
             tag => panic!("TeXpresso: unexpected tag {:?}", tag),
@@ -247,7 +251,7 @@ impl ClientIO {
         };
 
         match self.recv_u32() {
-            0 => return AccessResult::Pass,
+            0 => AccessResult::Pass,
             1 => {
                 stat.st_dev = self.recv_i32() as libc::dev_t;
                 stat.st_ino = self.recv_u32() as libc::ino_t;
@@ -265,10 +269,10 @@ impl ClientIO {
                 stat.st_ctime_nsec = self.recv_u32() as i64;
                 stat.st_mtime = self.recv_u32() as libc::time_t;
                 stat.st_mtime_nsec = self.recv_u32() as i64;
-                return AccessResult::Ok;
+                AccessResult::Ok
             }
-            2 => return AccessResult::ENoEnt,
-            3 => return AccessResult::EAccess,
+            2 => AccessResult::ENoEnt,
+            3 => AccessResult::EAccess,
             _ => panic!(),
         }
     }
@@ -281,7 +285,7 @@ impl ClientIO {
             self.delta += time;
             self.start_time = ProcessTime::now();
         };
-        return result;
+        result
     }
 }
 
@@ -322,7 +326,7 @@ impl Client {
         self.io.flush()
     }
 
-    pub fn open(&mut self, file: FileId, path: &str, mode: &str) -> bool {
+    pub fn open(&mut self, file: FileId, path: &str, mode: &str) -> Option<String> {
         //eprintln!("open({file}, {path}, {mode})");
         self.flush_pending();
         self.io.open(file, path, mode)
@@ -333,7 +337,7 @@ impl Client {
         self.io.read(file, pos, buf)
     }
 
-    pub fn write(&mut self, file: FileId, pos: u32, buf: &[u8]) -> () {
+    pub fn write(&mut self, file: FileId, pos: u32, buf: &[u8]) {
         if self.write_len > 0 {
             let abs_pos = self.write_pos + self.write_len;
             if self.write != file || abs_pos != pos {
@@ -356,7 +360,7 @@ impl Client {
         }
     }
 
-    pub fn close(&mut self, file: FileId) -> () {
+    pub fn close(&mut self, file: FileId) {
         self.flush_pending();
         self.io.close(file)
     }
