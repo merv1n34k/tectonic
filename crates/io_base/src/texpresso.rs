@@ -53,15 +53,17 @@ impl TexpressoIO {
     }
 
     /// TODO
-    pub fn clone(&self) -> Self {
+    pub fn stdout(&self) -> TexpressoStdout {
+        TexpressoStdout{io: self.state.clone()}
+    }
+}
+
+impl std::clone::Clone for TexpressoIO {
+    /// TODO
+    fn clone(&self) -> Self {
         let primary = self.primary.clone();
         let state = self.state.clone();
         TexpressoIO {state, primary}
-    }
-
-    /// TODO
-    pub fn stdout(&self) -> TexpressoStdout {
-        TexpressoStdout{io: self.state.clone()}
     }
 }
 
@@ -210,7 +212,7 @@ impl TexpressoIOState {
     }
 
     fn alloc_id(&mut self) -> txp::FileId {
-        let id = match self.released.pop() {
+        match self.released.pop() {
             Some(id) => id,
             None => {
                 let result = self.next_id;
@@ -220,9 +222,7 @@ impl TexpressoIOState {
                 self.next_id = result + 1;
                 result
             }
-        };
-        // eprintln!("alloc_id {id}");
-        id
+        }
     }
 
     fn release_id(&mut self, id: txp::FileId) {
