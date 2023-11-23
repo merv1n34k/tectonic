@@ -13,7 +13,6 @@ pub struct TexpressoIOState {
     client : txp::Client,
     released: Vec<txp::FileId>,
     next_id: txp::FileId,
-    gen: usize,
     last_passed_open: String,
 }
 
@@ -75,7 +74,7 @@ pub struct TexpressoReader {
     buf_pos: u32,
     buf_len: u32,
     size: Option<usize>,
-    gen: usize,
+    generation: usize,
 }
 
 impl TexpressoReader {
@@ -95,11 +94,12 @@ impl TexpressoReader {
 impl io::Read for TexpressoReader {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let mut io = self.io.borrow_mut();
-        if io.gen != self.gen {
+        let generation = io.client.generation();
+        if generation != self.generation {
             self.abs_pos += self.buf_pos as usize;
             self.buf_pos = 0;
             self.buf_len = 0;
-            self.gen = io.gen;
+            self.generation = generation;
         }
         if self.buf_pos == self.buf_len {
             let abs_pos = self.abs_pos + self.buf_pos as usize;
@@ -113,7 +113,7 @@ impl io::Read for TexpressoReader {
                     }
                     None => {
                         io.client.flush();
-                        io.gen += 1;
+                        io.client.bump_generation();
                         tectonic_geturl::reqwest::clear_shared_client();
                         let child = unsafe { io.client.fork() };
                         if child == 0 {
@@ -172,7 +172,7 @@ impl InputFeatures for TexpressoReader {
                 if ofs as usize > size {
                     panic!("TODO Find a way to return an error :D");
                 };
-                (size - ofs as usize) as usize
+                size - ofs as usize
             }
         };
         if pos > size {
@@ -200,7 +200,6 @@ impl TexpressoIOState {
             client,
             released: Vec::new(),
             next_id: 0,
-            gen: 0,
             last_passed_open: "".to_string(),
         }
     }
@@ -316,7 +315,7 @@ impl IoProvider for TexpressoIO {
         name: &str,
         _status: &mut dyn StatusBackend,
     ) -> OpenResult<InputHandle> {
-        let (id, open, gen) = {
+        let (id, open, generation) = {
             let mut io = self.borrow_mut();
             if name == io.last_passed_open {
                 return OpenResult::NotAvailable
@@ -329,14 +328,14 @@ impl IoProvider for TexpressoIO {
             } else {
                 io.last_passed_open = "".to_string();
             };
-            (id, open, io.gen)
+            (id, open, io.client.generation())
         };
         match open {
             | None => OpenResult::NotAvailable,
             | Some(path) => {
                 let reader = TexpressoReader {
                     io: self.state.clone(),
-                    id, gen,
+                    id, generation,
                     abs_pos: 0,
                     buf: [0; 1024],
                     buf_pos: 0,

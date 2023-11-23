@@ -15,6 +15,7 @@ pub struct ClientIO {
     file: File,
     start_time: ProcessTime,
     delta: Duration,
+    generation: usize,
 }
 
 pub struct Client {
@@ -62,6 +63,7 @@ impl ClientIO {
             file,
             start_time: ProcessTime::now(),
             delta: Duration::ZERO,
+            generation: 0,
         }
     }
 
@@ -114,6 +116,10 @@ impl ClientIO {
                             expected {expected_pid}")
                 };
                 std::process::exit(1)
+            }
+            b"FLSH" => {
+                self.generation += 1;
+                self.recv_tag()
             }
             tag => *tag
         }
@@ -305,6 +311,14 @@ impl Client {
 
     pub unsafe fn connect_raw_fd(fd: std::os::unix::io::RawFd) -> Client {
         Self::connect(File::from_raw_fd(fd))
+    }
+
+    pub fn generation(&self) -> usize {
+        self.io.generation
+    }
+
+    pub fn bump_generation(&mut self) {
+        self.io.generation += 1
     }
 
     fn flush_pending(&mut self) {
