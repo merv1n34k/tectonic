@@ -366,6 +366,20 @@ void synctex_start_input(void)
     return;
 }
 
+void synctex_end_file_reading(void)
+{
+    int len = 0;
+    int tag = cur_input.synctex_tag;
+
+    if (synctex_ctxt.file && tag > 0)
+        len = ttstub_fprintf(synctex_ctxt.file, "/%i\n", tag);
+
+    if (len > 0)
+        synctex_ctxt.total_length += len;
+
+    return;
+}
+
 /*  All the synctex... functions below have the smallest set of parameters.  It
  *  appears to be either the address of a node, or nothing at all.  Using mem,
  *  which is the place where all the nodes are stored, one can retrieve every
