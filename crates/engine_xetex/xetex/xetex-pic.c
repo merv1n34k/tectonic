@@ -252,13 +252,13 @@ find_pic_file (char **path, real_rect *bounds, int pdfBoxType, int page)
         bounds->ht = ht * 72.27;
     }
 
+    ttstub_input_close (handle);
+
     if (err == 0)
     {
         *path = xstrdup(name_of_file);
         ttstub_pic_set_cached_bounds(name_of_file, pdfBoxType, page, &bounds->x);
     }
-
-    ttstub_input_close (handle);
 
     return err;
 }
