@@ -106,6 +106,10 @@ impl ClientIO {
         i32::from_le_bytes(self.recv4())
     }
 
+    fn recv_f32(&mut self) -> f32 {
+        f32::from_le_bytes(self.recv4())
+    }
+
     fn recv_tag(&mut self) -> [u8; 4] {
         match &self.recv4() {
             b"TERM" => {
@@ -293,6 +297,39 @@ impl ClientIO {
         };
         result
     }
+
+    fn gpic(&mut self, path: &str, typ: i32, page: i32, bounds: &mut [f32; 4]) -> bool {
+        self.send_tag(*b"GPIC");
+        self.send_str(path);
+        self.send4(typ.to_le_bytes());
+        self.send4(page.to_le_bytes());
+        match &self.recv_tag() {
+            b"PASS" => false,
+            b"GPIC" => {
+                bounds[0] = self.recv_f32();
+                bounds[1] = self.recv_f32();
+                bounds[2] = self.recv_f32();
+                bounds[3] = self.recv_f32();
+                true
+            },
+            tag => panic!("TeXpresso: unexpected tag {:?}", tag),
+        }
+    }
+
+    fn spic(&mut self, path: &str, typ: i32, page: i32, bounds: &[f32; 4]) {
+        self.send_tag(*b"SPIC");
+        self.send_str(path);
+        self.send4(typ.to_le_bytes());
+        self.send4(page.to_le_bytes());
+        self.send4(bounds[0].to_le_bytes());
+        self.send4(bounds[1].to_le_bytes());
+        self.send4(bounds[2].to_le_bytes());
+        self.send4(bounds[3].to_le_bytes());
+        match &self.recv_tag() {
+            b"DONE" => (),
+            tag => panic!("TeXpresso: unexpected tag {:?}", tag),
+        }
+    }
 }
 
 impl Client {
@@ -421,6 +458,16 @@ impl Client {
     pub unsafe fn fork(&mut self) -> libc::pid_t {
         self.flush_pending();
         self.io.fork()
+    }
+
+    pub fn gpic(&mut self, path: &str, typ: i32, page: i32, bounds: &mut [f32; 4]) -> bool {
+        self.flush_pending();
+        self.io.gpic(path, typ, page, bounds)
+    }
+
+    pub fn spic(&mut self, path: &str, typ: i32, page: i32, bounds: &[f32; 4]) {
+        self.flush_pending();
+        self.io.spic(path, typ, page, bounds)
     }
 }
 
