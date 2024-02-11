@@ -185,27 +185,27 @@ impl InputHandle {
     /// only part of the file is read, not the entire thing. This seems
     /// to happen with biblatex XML state files.
     pub fn scan_remainder(&mut self) -> Result<()> {
-        const BUFSIZE: usize = 1024;
-        let mut buf: [u8; BUFSIZE] = [0; BUFSIZE];
+        // const BUFSIZE: usize = 1024;
+        // let mut buf: [u8; BUFSIZE] = [0; BUFSIZE];
 
-        loop {
-            let n = match self.inner.read(&mut buf[..]) {
-                Ok(n) => n,
+        // loop {
+        //     let n = match self.inner.read(&mut buf[..]) {
+        //         Ok(n) => n,
 
-                // There are times when the engine tries to open and read
-                // directories. When closing out such a handle, we'll get this
-                // error, but we should ignore it.
-                Err(ref ioe) if ioe.raw_os_error() == Some(libc::EISDIR) => return Ok(()),
+        //         // There are times when the engine tries to open and read
+        //         // directories. When closing out such a handle, we'll get this
+        //         // error, but we should ignore it.
+        //         Err(ref ioe) if ioe.raw_os_error() == Some(libc::EISDIR) => return Ok(()),
 
-                Err(e) => return Err(e.into()),
-            };
+        //         Err(e) => return Err(e.into()),
+        //     };
 
-            if n == 0 {
-                break;
-            }
+        //     if n == 0 {
+        //         break;
+        //     }
 
-            self.digest.update(&buf[..n]);
-        }
+        //     self.digest.update(&buf[..n]);
+        // }
 
         Ok(())
     }
