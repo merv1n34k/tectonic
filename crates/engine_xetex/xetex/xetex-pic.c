@@ -227,7 +227,10 @@ find_pic_file (char **path, real_rect *bounds, int pdfBoxType, int page)
     rust_input_handle_t handle;
 
     if (ttstub_pic_get_cached_bounds(name_of_file, pdfBoxType, page, &bounds->x) == 0)
-      return 0;
+    {
+        *path = xstrdup(name_of_file);
+        return 0;
+    }
 
 
     handle = ttstub_input_open (name_of_file, TTBC_FILE_FORMAT_PICT, 0);

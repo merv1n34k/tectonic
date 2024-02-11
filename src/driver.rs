@@ -764,6 +764,31 @@ impl DriverHooks for BridgeState {
             Err(SystemRequestError::NotAllowed)
         }
     }
+
+    /// TODO
+    fn pic_get_cached_bounds(&mut self,
+                             path: &str,
+                             typ: i32,
+                             page: i32,
+                             bounds: &mut [f32; 4]) -> bool
+    {
+        match self.texpresso {
+            None => false,
+            Some(ref mut texpresso) => texpresso.gpic(path, typ, page, bounds)
+        }
+    }
+
+    /// TODO
+    fn pic_set_cached_bounds(&mut self,
+                             path: &str,
+                             typ: i32,
+                             page: i32,
+                             bounds: &[f32; 4])
+    {
+        if let Some(ref mut texpresso) = self.texpresso {
+            texpresso.spic(path, typ, page, bounds)
+        }
+    }
 }
 
 /// Possible modes for handling shell-escape functionality

@@ -56,6 +56,16 @@ impl TexpressoIO {
     pub fn stdout(&self) -> TexpressoStdout {
         TexpressoStdout{io: self.state.clone()}
     }
+
+    /// TODO
+    pub fn gpic(&mut self, path: &str, typ: i32, page: i32, bounds: &mut [f32; 4]) -> bool {
+        self.borrow_mut().client.gpic(path, typ, page, bounds)
+    }
+
+    /// TODO
+    pub fn spic(&mut self, path: &str, typ: i32, page: i32, bounds: &[f32; 4]) {
+        self.borrow_mut().client.spic(path, typ, page, bounds)
+    }
 }
 
 impl std::clone::Clone for TexpressoIO {
