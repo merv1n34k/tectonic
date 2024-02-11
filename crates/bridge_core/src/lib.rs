@@ -150,6 +150,25 @@ pub trait DriverHooks {
     ) -> StdResult<(), SystemRequestError> {
         Err(SystemRequestError::NotImplemented)
     }
+
+    /// TODO
+    fn pic_get_cached_bounds(&mut self, 
+                             _path: &str,
+                             _type: i32,
+                             _page: i32,
+                             _bounds: &mut [f32; 4]) -> bool 
+    {
+        false
+    }
+
+    /// TODO
+    fn pic_set_cached_bounds(&mut self, 
+                             _path: &str,
+                             _type: i32,
+                             _page: i32,
+                             _bounds: &[f32; 4])
+    {
+    }
 }
 
 /// This type provides a minimal [`DriverHooks`] implementation.
@@ -995,6 +1014,40 @@ pub unsafe extern "C" fn ttbc_input_open(
     let rname = CStr::from_ptr(name).to_string_lossy();
     let ris_gz = is_gz != 0;
     es.input_open(&rname, format, ris_gz)
+}
+
+/// TODO
+/// # Safety
+/// TODO
+#[no_mangle]
+pub unsafe extern "C" fn ttbc_pic_get_cached_bounds(
+    es: &mut CoreBridgeState,
+    name: *const libc::c_char,
+    typ: libc::c_int,
+    page: libc::c_int,
+    bounds: *mut[libc::c_float; 4]
+    ) -> libc::c_int {
+    let path = CStr::from_ptr(name).to_string_lossy();
+    if es.hooks.pic_get_cached_bounds(&path, typ, page, &mut *bounds) {
+        0
+    } else {
+        1
+    }
+}
+
+/// TODO
+/// # Safety
+/// TODO
+#[no_mangle]
+pub unsafe extern "C" fn ttbc_pic_set_cached_bounds(
+    es: &mut CoreBridgeState,
+    name: *const libc::c_char,
+    typ: libc::c_int,
+    page: libc::c_int,
+    bounds: *const[libc::c_float; 4]
+    ) {
+    let path = CStr::from_ptr(name).to_string_lossy();
+    es.hooks.pic_set_cached_bounds(&path, typ, page, &*bounds);
 }
 
 /// Open the "primary input" file.

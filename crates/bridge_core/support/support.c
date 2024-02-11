@@ -323,3 +323,14 @@ ttstub_shell_escape(const unsigned short *cmd, size_t len)
 {
     return ttbc_shell_escape(tectonic_global_bridge_core, cmd, len);
 }
+
+int ttstub_pic_get_cached_bounds(const char *name, int type, int page, float bounds[4])
+{
+  return ttbc_pic_get_cached_bounds(tectonic_global_bridge_core, name, type, page, bounds);
+}
+
+void ttstub_pic_set_cached_bounds(const char *name, int type, int page, float bounds[4])
+{
+  ttbc_pic_set_cached_bounds(tectonic_global_bridge_core, name, type, page, bounds);
+}
+
