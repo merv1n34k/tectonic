@@ -226,7 +226,7 @@ find_pic_file (char **path, real_rect *bounds, int pdfBoxType, int page)
     int err = -1;
     rust_input_handle_t handle;
 
-    if (ttstub_pic_get_cached_bounds(name_of_file, pdfBoxType, page, &bounds->x) == 0)
+    if (ttstub_pic_get_cached_bounds(name_of_file, pdfBoxType, page, (void*)bounds) == 0)
     {
         *path = xstrdup(name_of_file);
         return 0;
@@ -257,7 +257,7 @@ find_pic_file (char **path, real_rect *bounds, int pdfBoxType, int page)
     if (err == 0)
     {
         *path = xstrdup(name_of_file);
-        ttstub_pic_set_cached_bounds(name_of_file, pdfBoxType, page, &bounds->x);
+        ttstub_pic_set_cached_bounds(name_of_file, pdfBoxType, page, (void*)bounds);
     }
 
     return err;
