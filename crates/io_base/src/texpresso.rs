@@ -127,24 +127,7 @@ impl io::Read for TexpressoReader {
                         io.client.flush();
                         io.client.bump_generation();
                         tectonic_geturl::reqwest::clear_shared_client();
-                        let child = unsafe { io.client.fork() };
-                        if child == 0 {
-                            io.client.child(unsafe{libc::getpid()})
-                        } else {
-                            let mut status : i32 = 1;
-                            let result =
-                                unsafe { wait(std::ptr::addr_of_mut!(status)) };
-                            if result == -1 {
-                                panic!("TeXpresso: fork: error while waiting for child");
-                            };
-                            if result != child {
-                                panic!("TeXpresso: fork: unexpected pid");
-                            };
-                            let resume = io.client.back(unsafe{libc::getpid()}, child, status as u32);
-                            if !resume {
-                                std::process::exit(1)
-                            }
-                        }
+                        let _ = unsafe { io.client.fork() };
                     }
                 }
             }
