@@ -15,17 +15,20 @@
     abort();                  \
   }
 
-static ssize_t send_child_fd(int channel, int child)
+static void send_child_fd(int channel, int32_t pid, int child)
 {
+  ssize_t sent;
   char buffer[4] = "CHLD";
-  char msg_control[CMSG_SPACE(1 * sizeof(int))];
-  struct iovec iov = { .iov_base = buffer, .iov_len = 4 };
+  NO_EINTR(sent = write(channel, buffer, 4));
+  PASSERT(sent == 4);
+
+  char msg_control[CMSG_SPACE(1 * sizeof(int))] = {0,};
+  struct iovec iov = { .iov_base = &pid, .iov_len = 4 };
   struct msghdr msg = {
     .msg_iov = &iov, .msg_iovlen = 1,
     .msg_controllen = CMSG_SPACE(1 * sizeof(int)),
   };
   msg.msg_control = &msg_control;
-  memset(msg.msg_control, 0, msg.msg_controllen);
 
   struct cmsghdr *cm = CMSG_FIRSTHDR(&msg);
   cm->cmsg_level = SOL_SOCKET;
@@ -35,9 +38,8 @@ static ssize_t send_child_fd(int channel, int child)
   int *fds0 = (int*)CMSG_DATA(cm);
   fds0[0] = child;
 
-  ssize_t sent;
   NO_EINTR(sent = sendmsg(channel, &msg, 0));
-  return sent;
+  PASSERT(sent == 4);
 }
 
 int texpresso_fork_with_channel(int fd)
@@ -55,17 +57,20 @@ int texpresso_fork_with_channel(int fd)
   // Create socket
   PASSERT(socketpair(PF_UNIX, SOCK_STREAM, 0, sockets) == 0);
 
-  // Send socket to driver
-  PASSERT(send_child_fd(fd, sockets[0]) == 4);
-  PASSERT(close(sockets[0]) == 0);
-
   // Fork
   pid_t child;
   PASSERT((child = fork()) != -1);
 
-  // Update channel in child
+  // Send socket and update channel in child
   if (child == 0)
+  {
     PASSERT(dup2(sockets[1], fd) != -1);
+  }
+  else
+  {
+    send_child_fd(fd, child, sockets[0]);
+  }
+  PASSERT(close(sockets[0]) == 0);
 
   // Release temporary socket
   PASSERT(close(sockets[1]) == 0);
