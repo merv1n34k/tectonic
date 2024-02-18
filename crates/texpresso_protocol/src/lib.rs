@@ -50,6 +50,7 @@ fn write_or_panic(file: &mut File, data: &[u8]) {
 extern "C" {
     fn texpresso_fork_with_channel(
         fd: libc::c_int,
+        time: u32
         ) -> libc::c_int;
 }
 
@@ -273,10 +274,10 @@ impl ClientIO {
 
     unsafe fn fork(&mut self) -> libc::pid_t {
         self.flush();
-        let time = ProcessTime::elapsed(&self.start_time);
-        let result = texpresso_fork_with_channel(self.file.as_raw_fd());
+        let delta = self.delta + ProcessTime::elapsed(&self.start_time);
+        let result = texpresso_fork_with_channel(self.file.as_raw_fd(), delta.as_millis() as u32);
         if result == 0 {
-            self.delta += time;
+            self.delta = delta;
             self.start_time = ProcessTime::now();
         };
         result

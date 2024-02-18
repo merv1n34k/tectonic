@@ -16,13 +16,13 @@
     abort();                  \
   }
 
-static void send_child_fd(int chan_fd, int32_t pid, int child_fd)
+static void send_child_fd(int chan_fd, int32_t pid, uint32_t time, int child_fd)
 {
   ssize_t sent;
   char msg_control[CMSG_SPACE(1 * sizeof(int))] = {0,};
   struct iovec iov[3] = {
     { .iov_base = "CHLD", .iov_len = 4 },
-    { .iov_base = &pid, .iov_len = 4 },
+    { .iov_base = &time, .iov_len = 4 },
     { .iov_base = &pid, .iov_len = 4 },
   };
   struct msghdr msg = {
@@ -43,7 +43,7 @@ static void send_child_fd(int chan_fd, int32_t pid, int child_fd)
   PASSERT(sent == 12);
 }
 
-int texpresso_fork_with_channel(int fd)
+int texpresso_fork_with_channel(int fd, uint32_t time)
 {
   // Ignore SIGCHLD to simplify process management 
   static int signal_setup = 0;
@@ -70,7 +70,7 @@ int texpresso_fork_with_channel(int fd)
   else
   {
     // In parent: send other end of new socket to driver
-    send_child_fd(fd, child, sockets[0]);
+    send_child_fd(fd, child, time, sockets[0]);
     char answer[4];
     int recvd;
     NO_EINTR(recvd = read(fd, answer, 4));
