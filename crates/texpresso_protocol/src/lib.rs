@@ -29,6 +29,10 @@ pub struct Client {
     write_len: u32,
 }
 
+fn fmt_tag(tag: &[u8; 4]) -> [char; 4] {
+    [tag[0] as char, tag[1] as char, tag[2] as char, tag[3] as char]
+}
+
 fn write_or_panic(file: &mut File, data: &[u8]) {
     match file.write(data) {
         Ok(n) => {
@@ -130,7 +134,7 @@ impl ClientIO {
     fn check_done(&mut self) {
         match &self.recv_tag() {
             b"DONE" => (),
-            tag => panic!("TeXpresso: unexpected tag {:?}", tag),
+            tag => panic!("TeXpresso: unexpected tag {:?}", fmt_tag(tag)),
         }
     }
 
@@ -147,7 +151,7 @@ impl ClientIO {
                 self.file.read_exact(&mut buf).unwrap();
                 Some(String::from_utf8(buf).unwrap())
             },
-            tag => panic!("TeXpresso: unexpected tag {:?}", tag),
+            tag => panic!("TeXpresso: unexpected tag {:?}", fmt_tag(tag)),
         }
     }
 
@@ -167,7 +171,7 @@ impl ClientIO {
                 self.file.read_exact(&mut buf[..rd_size]).unwrap();
                 Some(rd_size)
             }
-            tag => panic!("TeXpresso: unexpected tag {:?}", tag),
+            tag => panic!("TeXpresso: unexpected tag {:?}", fmt_tag(tag)),
         }
     }
 
@@ -193,7 +197,7 @@ impl ClientIO {
         self.send4(file.to_le_bytes());
         match &self.recv_tag() {
             b"SIZE" => self.recv_u32(),
-            tag => panic!("TeXpresso: unexpected tag {:?}", tag),
+            tag => panic!("TeXpresso: unexpected tag {:?}", fmt_tag(tag)),
         }
     }
 
@@ -227,7 +231,7 @@ impl ClientIO {
                 3 => AccessResult::EAccess,
                 _ => panic!(),
             },
-            tag => panic!("TeXpresso: unexpected tag {:?}", tag),
+            tag => panic!("TeXpresso: unexpected tag {:?}", fmt_tag(tag)),
         }
     }
 
@@ -237,7 +241,7 @@ impl ClientIO {
 
         match &self.recv_tag() {
             b"STAT" => (),
-            tag => panic!("TeXpresso: unexpected tag {:?}", tag),
+            tag => panic!("TeXpresso: unexpected tag {:?}", fmt_tag(tag)),
         };
 
         match self.recv_u32() {
@@ -292,7 +296,7 @@ impl ClientIO {
                 bounds[3] = self.recv_f32();
                 true
             },
-            tag => panic!("TeXpresso: unexpected tag {:?}", tag),
+            tag => panic!("TeXpresso: unexpected tag {:?}", fmt_tag(tag)),
         }
     }
 
@@ -307,7 +311,7 @@ impl ClientIO {
         self.send4(bounds[3].to_le_bytes());
         match &self.recv_tag() {
             b"DONE" => (),
-            tag => panic!("TeXpresso: unexpected tag {:?}", tag),
+            tag => panic!("TeXpresso: unexpected tag {:?}", fmt_tag(tag)),
         }
     }
 }

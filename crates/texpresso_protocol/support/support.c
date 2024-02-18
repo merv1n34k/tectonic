@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <signal.h>
 
 #define NO_EINTR(command) \
   do {} while ((command) == -1 && errno == EINTR)
@@ -15,17 +16,17 @@
     abort();                  \
   }
 
-static void send_child_fd(int channel, int32_t pid, int child)
+static void send_child_fd(int chan_fd, int32_t pid, int child_fd)
 {
   ssize_t sent;
-  char buffer[4] = "CHLD";
-  NO_EINTR(sent = write(channel, buffer, 4));
-  PASSERT(sent == 4);
-
   char msg_control[CMSG_SPACE(1 * sizeof(int))] = {0,};
-  struct iovec iov = { .iov_base = &pid, .iov_len = 4 };
+  struct iovec iov[3] = {
+    { .iov_base = "CHLD", .iov_len = 4 },
+    { .iov_base = &pid, .iov_len = 4 },
+    { .iov_base = &pid, .iov_len = 4 },
+  };
   struct msghdr msg = {
-    .msg_iov = &iov, .msg_iovlen = 1,
+    .msg_iov = iov, .msg_iovlen = 3,
     .msg_controllen = CMSG_SPACE(1 * sizeof(int)),
   };
   msg.msg_control = &msg_control;
@@ -36,10 +37,10 @@ static void send_child_fd(int channel, int32_t pid, int child)
   cm->cmsg_len = CMSG_LEN(1 * sizeof(int));
 
   int *fds0 = (int*)CMSG_DATA(cm);
-  fds0[0] = child;
+  fds0[0] = child_fd;
 
-  NO_EINTR(sent = sendmsg(channel, &msg, 0));
-  PASSERT(sent == 4);
+  NO_EINTR(sent = sendmsg(chan_fd, &msg, 0));
+  PASSERT(sent == 12);
 }
 
 int texpresso_fork_with_channel(int fd)
@@ -61,14 +62,21 @@ int texpresso_fork_with_channel(int fd)
   pid_t child;
   PASSERT((child = fork()) != -1);
 
-  // Send socket and update channel in child
   if (child == 0)
   {
+    // In child: replace channel with new socket
     PASSERT(dup2(sockets[1], fd) != -1);
   }
   else
   {
+    // In parent: send other end of new socket to driver
     send_child_fd(fd, child, sockets[0]);
+    char answer[4];
+    int recvd;
+    NO_EINTR(recvd = read(fd, answer, 4));
+    PASSERT(recvd == 4 && 
+            answer[0] == 'D' && answer[1] == 'O' &&
+            answer[2] == 'N' && answer[3] == 'E');
   }
   PASSERT(close(sockets[0]) == 0);
 
