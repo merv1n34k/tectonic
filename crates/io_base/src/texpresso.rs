@@ -2,7 +2,6 @@
 
 // use super::{InputHandle, IoProvider, OpenResult, OutputHandle};
 use std::{rc::Rc, cell::{RefCell, RefMut}, io, env};
-use libc::wait;
 use texpresso_protocol as txp;
 use tectonic_status_base::StatusBackend;
 use crate::{IoProvider, OpenResult, InputHandle, OutputHandle,
