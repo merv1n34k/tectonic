@@ -2668,6 +2668,7 @@ dependencies = [
 name = "texpresso_protocol"
 version = "0.1.0"
 dependencies = [
+ "cc",
  "cpu-time",
  "libc",
 ]

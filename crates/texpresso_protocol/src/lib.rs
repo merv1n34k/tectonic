@@ -3,6 +3,7 @@ use std::{
     fs::File,
     io::{Read, Write},
     os::unix::prelude::FromRawFd,
+    os::fd::AsRawFd,
     time::Duration,
 };
 
@@ -28,6 +29,10 @@ pub struct Client {
     write_len: u32,
 }
 
+fn fmt_tag(tag: &[u8; 4]) -> [char; 4] {
+    [tag[0] as char, tag[1] as char, tag[2] as char, tag[3] as char]
+}
+
 fn write_or_panic(file: &mut File, data: &[u8]) {
     match file.write(data) {
         Ok(n) => {
@@ -40,6 +45,13 @@ fn write_or_panic(file: &mut File, data: &[u8]) {
             std::process::exit(1)
         }
     }
+}
+
+extern "C" {
+    fn texpresso_fork_with_channel(
+        fd: libc::c_int,
+        time: u32
+        ) -> libc::c_int;
 }
 
 pub enum AccessResult {
@@ -112,15 +124,6 @@ impl ClientIO {
 
     fn recv_tag(&mut self) -> [u8; 4] {
         match &self.recv4() {
-            b"TERM" => {
-                let expected_pid = self.recv_i32();
-                let self_pid = unsafe {libc::getpid()};
-                if expected_pid != self_pid {
-                    panic!("TeXpresso terminate: process pid is {self_pid}, \
-                            expected {expected_pid}")
-                };
-                std::process::exit(1)
-            }
             b"FLSH" => {
                 self.generation += 1;
                 self.recv_tag()
@@ -132,7 +135,7 @@ impl ClientIO {
     fn check_done(&mut self) {
         match &self.recv_tag() {
             b"DONE" => (),
-            tag => panic!("TeXpresso: unexpected tag {:?}", tag),
+            tag => panic!("TeXpresso: unexpected tag {:?}", fmt_tag(tag)),
         }
     }
 
@@ -149,7 +152,7 @@ impl ClientIO {
                 self.file.read_exact(&mut buf).unwrap();
                 Some(String::from_utf8(buf).unwrap())
             },
-            tag => panic!("TeXpresso: unexpected tag {:?}", tag),
+            tag => panic!("TeXpresso: unexpected tag {:?}", fmt_tag(tag)),
         }
     }
 
@@ -169,7 +172,7 @@ impl ClientIO {
                 self.file.read_exact(&mut buf[..rd_size]).unwrap();
                 Some(rd_size)
             }
-            tag => panic!("TeXpresso: unexpected tag {:?}", tag),
+            tag => panic!("TeXpresso: unexpected tag {:?}", fmt_tag(tag)),
         }
     }
 
@@ -195,7 +198,7 @@ impl ClientIO {
         self.send4(file.to_le_bytes());
         match &self.recv_tag() {
             b"SIZE" => self.recv_u32(),
-            tag => panic!("TeXpresso: unexpected tag {:?}", tag),
+            tag => panic!("TeXpresso: unexpected tag {:?}", fmt_tag(tag)),
         }
     }
 
@@ -203,24 +206,6 @@ impl ClientIO {
         self.send_tag(*b"SEEN");
         self.send4(file.to_le_bytes());
         self.send4(pos.to_le_bytes());
-    }
-
-    fn child(&mut self, id: ClientId) {
-        self.send_tag(*b"CHLD");
-        self.send4(id.to_le_bytes());
-        self.check_done();
-    }
-
-    fn back(&mut self, id: ClientId, child: ClientId, exitcode: u32) -> bool {
-        self.send_tag(*b"BACK");
-        self.send4(id.to_le_bytes());
-        self.send4(child.to_le_bytes());
-        self.send4(exitcode.to_le_bytes());
-        match &self.recv_tag() {
-            b"DONE" => true,
-            b"PASS" => false,
-            tag => panic!("TeXpresso: unexpected tag {:?}", tag),
-        }
     }
 
     fn accs(&mut self, path: &str, read: bool, write: bool, execute: bool) -> AccessResult {
@@ -247,7 +232,7 @@ impl ClientIO {
                 3 => AccessResult::EAccess,
                 _ => panic!(),
             },
-            tag => panic!("TeXpresso: unexpected tag {:?}", tag),
+            tag => panic!("TeXpresso: unexpected tag {:?}", fmt_tag(tag)),
         }
     }
 
@@ -257,7 +242,7 @@ impl ClientIO {
 
         match &self.recv_tag() {
             b"STAT" => (),
-            tag => panic!("TeXpresso: unexpected tag {:?}", tag),
+            tag => panic!("TeXpresso: unexpected tag {:?}", fmt_tag(tag)),
         };
 
         match self.recv_u32() {
@@ -289,10 +274,10 @@ impl ClientIO {
 
     unsafe fn fork(&mut self) -> libc::pid_t {
         self.flush();
-        let time = ProcessTime::elapsed(&self.start_time);
-        let result = libc::fork();
+        let delta = self.delta + ProcessTime::elapsed(&self.start_time);
+        let result = texpresso_fork_with_channel(self.file.as_raw_fd(), delta.as_millis() as u32);
         if result == 0 {
-            self.delta += time;
+            self.delta = delta;
             self.start_time = ProcessTime::now();
         };
         result
@@ -312,7 +297,7 @@ impl ClientIO {
                 bounds[3] = self.recv_f32();
                 true
             },
-            tag => panic!("TeXpresso: unexpected tag {:?}", tag),
+            tag => panic!("TeXpresso: unexpected tag {:?}", fmt_tag(tag)),
         }
     }
 
@@ -327,7 +312,7 @@ impl ClientIO {
         self.send4(bounds[3].to_le_bytes());
         match &self.recv_tag() {
             b"DONE" => (),
-            tag => panic!("TeXpresso: unexpected tag {:?}", tag),
+            tag => panic!("TeXpresso: unexpected tag {:?}", fmt_tag(tag)),
         }
     }
 }
@@ -429,20 +414,6 @@ impl Client {
         if self.seen_pos < pos {
             self.seen_pos = pos;
         }
-    }
-
-    pub fn child(&mut self, id: ClientId) {
-        if self.write_len > 0 || self.seen_pos > 0 {
-            panic!("texpresso child: expecting empty buffer");
-        }
-        self.io.child(id)
-    }
-
-    pub fn back(&mut self, id: ClientId, child: ClientId, exitcode: u32) -> bool {
-        if self.write_len > 0 || self.seen_pos > 0 {
-            panic!("texpresso back: expecting empty buffer");
-        }
-        self.io.back(id, child, exitcode)
     }
 
     pub fn accs(&mut self, path: &str, read: bool, write: bool, execute: bool) -> AccessResult {
