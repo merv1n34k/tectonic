@@ -114,10 +114,6 @@ impl ClientIO {
         u32::from_le_bytes(self.recv4())
     }
 
-    fn recv_i32(&mut self) -> i32 {
-        i32::from_le_bytes(self.recv4())
-    }
-
     fn recv_f32(&mut self) -> f32 {
         f32::from_le_bytes(self.recv4())
     }
@@ -206,70 +202,6 @@ impl ClientIO {
         self.send_tag(*b"SEEN");
         self.send4(file.to_le_bytes());
         self.send4(pos.to_le_bytes());
-    }
-
-    fn accs(&mut self, path: &str, read: bool, write: bool, execute: bool) -> AccessResult {
-        let mut mode: u32 = 0;
-        if read {
-            mode |= 1
-        };
-        if write {
-            mode |= 2
-        };
-        if execute {
-            mode |= 4
-        };
-
-        self.send_tag(*b"ACCS");
-        self.send_str(path);
-        self.send4(mode.to_le_bytes());
-
-        match &self.recv_tag() {
-            b"ACCS" => match self.recv_u32() {
-                0 => AccessResult::Pass,
-                1 => AccessResult::Ok,
-                2 => AccessResult::ENoEnt,
-                3 => AccessResult::EAccess,
-                _ => panic!(),
-            },
-            tag => panic!("TeXpresso: unexpected tag {:?}", fmt_tag(tag)),
-        }
-    }
-
-    fn stat(&mut self, path: &str, stat: &mut libc::stat) -> AccessResult {
-        self.send_tag(*b"STAT");
-        self.send_str(path);
-
-        match &self.recv_tag() {
-            b"STAT" => (),
-            tag => panic!("TeXpresso: unexpected tag {:?}", fmt_tag(tag)),
-        };
-
-        match self.recv_u32() {
-            0 => AccessResult::Pass,
-            1 => {
-                stat.st_dev = self.recv_i32() as libc::dev_t;
-                stat.st_ino = self.recv_u32() as libc::ino_t;
-                stat.st_mode = self.recv_u32() as libc::mode_t;
-                stat.st_nlink = self.recv_u32() as libc::nlink_t;
-                stat.st_uid = self.recv_u32() as libc::uid_t;
-                stat.st_gid = self.recv_u32() as libc::gid_t;
-                stat.st_rdev = self.recv_i32() as libc::dev_t;
-                stat.st_size = self.recv_u32() as libc::off_t;
-                stat.st_blksize = self.recv_i32() as libc::blksize_t;
-                stat.st_blocks = self.recv_u32() as libc::blkcnt_t;
-                stat.st_atime = self.recv_u32() as libc::time_t;
-                stat.st_atime_nsec = self.recv_u32() as i64;
-                stat.st_ctime = self.recv_u32() as libc::time_t;
-                stat.st_ctime_nsec = self.recv_u32() as i64;
-                stat.st_mtime = self.recv_u32() as libc::time_t;
-                stat.st_mtime_nsec = self.recv_u32() as i64;
-                AccessResult::Ok
-            }
-            2 => AccessResult::ENoEnt,
-            3 => AccessResult::EAccess,
-            _ => panic!(),
-        }
     }
 
     unsafe fn fork(&mut self) -> libc::pid_t {
@@ -414,16 +346,6 @@ impl Client {
         if self.seen_pos < pos {
             self.seen_pos = pos;
         }
-    }
-
-    pub fn accs(&mut self, path: &str, read: bool, write: bool, execute: bool) -> AccessResult {
-        self.flush_pending();
-        self.io.accs(path, read, write, execute)
-    }
-
-    pub fn stat(&mut self, path: &str, stat: &mut libc::stat) -> AccessResult {
-        self.flush_pending();
-        self.io.stat(path, stat)
     }
 
     pub unsafe fn fork(&mut self) -> libc::pid_t {
