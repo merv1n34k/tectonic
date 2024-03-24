@@ -152,7 +152,7 @@ impl CompileOptions {
         let mut texpresso_status = match texpresso {
             None => None,
             Some(ref texpresso) => {
-                let level = tectonic_status_base::ChatterLevel::Minimal;
+                let level = tectonic_status_base::ChatterLevel::Normal;
                 let backend = TexpressoStatusBackend::new(level, texpresso.stdout());
                 Some(Box::new(backend) as Box<dyn StatusBackend>)
             }

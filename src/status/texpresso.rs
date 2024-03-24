@@ -5,7 +5,7 @@
 
 use std::{
     fmt::Arguments,
-    io::{self, Write},
+    io::{self, Write, stderr},
 };
 use tectonic_errors::Error;
 use tectonic_io_base::texpresso::TexpressoStdout;
@@ -26,27 +26,33 @@ impl TexpressoStatusBackend {
     pub fn new(chatter: ChatterLevel, output: TexpressoStdout) -> Self {
         TexpressoStatusBackend {chatter, output}
     }
+
+}
+
+fn write_report<T : Write>(output: &mut T,
+                           prefix: &str,
+                           args: Arguments,
+                           err: Option<&Error>)
+{
+    writeln!(output, "{prefix} {args}").unwrap();
+    if let Some(e) = err {
+        for item in e.chain() {
+            writeln!(output, "caused by: {item}").unwrap();
+        }
+    }
 }
 
 impl StatusBackend for TexpressoStatusBackend {
+
     fn report(&mut self, kind: MessageKind, args: Arguments, err: Option<&Error>) {
         if self.chatter.suppress_message(kind) {
             return;
         }
-
-        let prefix = match kind {
-            MessageKind::Note => "note:",
-            MessageKind::Warning => "warning:",
-            MessageKind::Error => "error:",
+        match kind {
+            MessageKind::Note => write_report(&mut stderr(), "note:", args, err),
+            MessageKind::Warning => write_report(&mut self.output, "warning:", args, err),
+            MessageKind::Error => write_report(&mut self.output, "error:", args, err),
         };
-
-        writeln!(self.output, "{prefix} {args}").unwrap();
-
-        if let Some(e) = err {
-            for item in e.chain() {
-                writeln!(self.output, "caused by: {item}").unwrap();
-            }
-        }
     }
 
     fn report_error(&mut self, err: &Error) {
