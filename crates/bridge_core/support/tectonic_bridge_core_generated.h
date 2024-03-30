@@ -229,6 +229,18 @@ ttbc_input_handle_t *ttbc_input_open(ttbc_state_t *es,
                                      ttbc_file_format format,
                                      int is_gz);
 
+int ttbc_pic_get_cached_bounds(ttbc_state_t *es,
+                               const char *name,
+                               int type,
+                               int page,
+                               float bounds[4]);
+
+void ttbc_pic_set_cached_bounds(ttbc_state_t *es,
+                                const char *name,
+                                int type,
+                                int page,
+                                float bounds[4]);
+
 /**
  * Open the "primary input" file.
  */
