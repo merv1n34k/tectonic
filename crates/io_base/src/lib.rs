@@ -34,6 +34,7 @@ pub mod filesystem;
 pub mod flate2;
 pub mod stack;
 pub mod stdstreams;
+pub mod texpresso;
 
 /// Errors that are generic to Tectonic's framework, but not capturable as
 /// IoErrors.
