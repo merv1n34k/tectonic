@@ -332,7 +332,7 @@ impl InputFeatures for InputHandle {
 pub struct OutputHandle {
     name: String,
     inner: Box<dyn Write>,
-    digest: digest::DigestComputer,
+    digest: Option<digest::DigestComputer>,
 }
 
 impl OutputHandle {
@@ -341,7 +341,16 @@ impl OutputHandle {
         OutputHandle {
             name: name.into(),
             inner: Box::new(inner),
-            digest: digest::create(),
+            digest: Some(digest::create()),
+        }
+    }
+
+    /// Create a new output handle that will not produce a digest of its contents.
+    pub fn new_without_digest<T: 'static + Write>(name: impl Into<String>, inner: T) -> OutputHandle {
+        OutputHandle {
+            name: name.into(),
+            inner: Box::new(inner),
+            digest: None,
         }
     }
 
@@ -359,14 +368,20 @@ impl OutputHandle {
     /// Consumes the object and returns the SHA256 sum of the content that was
     /// written.
     pub fn into_name_digest(self) -> (String, DigestData) {
-        (self.name, DigestData::from(self.digest))
+        let digestdata = match self.digest {
+            Some(digest) => DigestData::from(digest),
+            None => DigestData::zeros()
+        };
+        (self.name, digestdata)
     }
 }
 
 impl Write for OutputHandle {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         let n = self.inner.write(buf)?;
-        self.digest.update(&buf[..n]);
+        if let Some(ref mut digest) = self.digest {
+            digest.update(&buf[..n]);
+        };
         Ok(n)
     }
 
