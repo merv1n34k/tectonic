@@ -485,6 +485,15 @@ pub trait IoProvider: AsIoProviderMut {
         }
     }
 
+    /// TODO
+    fn input_path(
+        &mut self,
+        _name: &str,
+        _status: &mut dyn StatusBackend,
+    ) -> OpenResult<PathBuf> {
+        OpenResult::NotAvailable
+    }
+
     /// Open the "primary" input file, which in the context of TeX is the main
     /// input that it's given. When the build is being done using the
     /// filesystem and the input is a file on the filesystem, this function
