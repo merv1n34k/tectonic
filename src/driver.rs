@@ -1190,6 +1190,7 @@ impl ProcessingSessionBuilder {
                 // Note that, due to the expected need to rerun the engine
                 // multiple times, we'll need to buffer stdin in its entirety,
                 // so we might as well do that now.
+                assert!(self.texpresso.is_none());
                 let pio = ctry!(BufferedPrimaryIo::from_stdin(); "error reading standard input");
                 let pio: Box<dyn IoProvider> = Box::new(pio);
                 (pio, None, "".into())
@@ -1197,6 +1198,7 @@ impl ProcessingSessionBuilder {
 
             PrimaryInputMode::Buffer(buf) => {
                 // Same behavior as with stdin.
+                assert!(self.texpresso.is_none());
                 let pio: Box<dyn IoProvider> = Box::new(BufferedPrimaryIo::from_buffer(buf));
                 (pio, None, "".into())
             }
