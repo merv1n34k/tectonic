@@ -37,6 +37,7 @@ use tectonic_io_base::{
     filesystem::{FilesystemIo, FilesystemPrimaryInputIo},
     stdstreams::{BufferedPrimaryIo, GenuineStdoutIo},
     InputHandle, IoProvider, OpenResult, OutputHandle,
+    texpresso::TexpressoIO,
 };
 
 use crate::{
@@ -227,6 +228,9 @@ struct BridgeState {
 
     /// Memory buffering for files written during processing.
     mem: MemoryIo,
+
+    /// Connection to TeXpresso server
+    texpresso: Option<TexpressoIO>,
 
     /// The main filesystem backing for input files in the project.
     filesystem: FilesystemIo,
@@ -452,6 +456,9 @@ macro_rules! bridgestate_ioprovider_cascade {
             bridgestate_ioprovider_try!(p, $($inner)+);
             false
         } else {
+            if let Some(ref mut texpresso) = $self.texpresso {
+                bridgestate_ioprovider_try!(texpresso, $($inner)+);
+            }
             bridgestate_ioprovider_try!($self.primary_input, $($inner)+);
             true
         };
@@ -661,6 +668,8 @@ impl DriverHooks for BridgeState {
         digest: Option<DigestData>,
         _status: &mut dyn StatusBackend,
     ) {
+        if self.texpresso.is_some() { return }
+
         let summ = self
             .events
             .get_mut(&name)
@@ -815,6 +824,7 @@ pub struct ProcessingSessionBuilder {
     keep_intermediates: bool,
     keep_logs: bool,
     synctex: Option<SyncTexConfig>,
+    texpresso: Option<TexpressoIO>,
     build_date: Option<SystemTime>,
     unstables: UnstableOptions,
     shell_escape_mode: ShellEscapeMode,
@@ -1014,6 +1024,12 @@ impl ProcessingSessionBuilder {
         self
     }
 
+    /// Set TeXpresso server
+    pub fn texpresso(&mut self, texpresso: Option<TexpressoIO>) -> &mut Self {
+        self.texpresso = texpresso;
+        self
+    }
+
     /// Enable "shell escape" commands in the engines, and use the specified
     /// directory for shell-escape work. The caller is responsible for the
     /// creation and/or destruction of this directory. The default is to
@@ -1134,7 +1150,10 @@ impl ProcessingSessionBuilder {
                 };
 
                 filesystem_root = parent.clone();
-                let pio: Box<dyn IoProvider> = Box::new(FilesystemPrimaryInputIo::new(&p));
+                let pio: Box<dyn IoProvider> = match self.texpresso {
+                    None => Box::new(FilesystemPrimaryInputIo::new(&p)),
+                    Some(ref texpresso) => Box::new(texpresso.clone())
+                };
                 (pio, Some(p), parent)
             }
 
@@ -1192,6 +1211,7 @@ impl ProcessingSessionBuilder {
         let bs = BridgeState {
             primary_input: pio,
             mem,
+            texpresso: self.texpresso,
             filesystem,
             extra_search_paths,
             shell_escape_work: None,
