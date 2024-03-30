@@ -184,6 +184,8 @@ impl InputHandle {
     /// only part of the file is read, not the entire thing. This seems
     /// to happen with biblatex XML state files.
     pub fn scan_remainder(&mut self) -> Result<()> {
+        if self.read_only { return Ok(()) };
+
         const BUFSIZE: usize = 1024;
         let mut buf: [u8; BUFSIZE] = [0; BUFSIZE];
 
