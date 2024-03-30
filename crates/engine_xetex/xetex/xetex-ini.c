@@ -347,6 +347,7 @@ bool xtx_ligature_present;
 scaled_t delta;
 bool synctex_enabled;
 bool synctex_use_gz;
+bool synctex_texpresso_extension;
 bool used_tectonic_coda_tokens;
 bool semantic_pagination_enabled;
 bool gave_char_warning_help;

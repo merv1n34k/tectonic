@@ -116,11 +116,11 @@ impl CompileOptions {
             ProcessingSessionBuilder::new_with_security(SecuritySettings::new(stance));
         let format_path = self.format;
         let deterministic_mode = unstable.deterministic_mode;
-        
+
         let synctex = if !self.synctex {
             None
         } else {
-            Some(SyncTexConfig{use_gz:true})
+            Some(SyncTexConfig{use_gz:true, texpresso_extension:false})
         };
 
         sess_builder

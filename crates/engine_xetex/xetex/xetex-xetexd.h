@@ -721,6 +721,7 @@ extern bool xtx_ligature_present;
 extern scaled_t delta;
 extern bool synctex_enabled;
 extern bool synctex_use_gz;
+extern bool synctex_texpresso_extension;
 extern bool used_tectonic_coda_tokens;
 extern bool semantic_pagination_enabled;
 extern bool gave_char_warning_help;

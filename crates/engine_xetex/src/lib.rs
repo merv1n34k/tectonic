@@ -68,6 +68,8 @@ pub enum TexOutcome {
 pub struct SyncTexConfig {
     /// TODO
     pub use_gz: bool,
+    /// TODO
+    pub texpresso_extension: bool,
 }
 
 /// A struct for invoking the (Xe)TeX engine.
@@ -220,6 +222,10 @@ impl TexEngine {
                     tt_xetex_set_int_variable(
                         b"synctex_use_gz\0".as_ptr() as _,
                         config.use_gz.into()
+                    );
+                    tt_xetex_set_int_variable(
+                        b"synctex_texpresso_extension\0".as_ptr() as _,
+                        config.texpresso_extension.into()
                     );
                 };
                 tt_xetex_set_int_variable(
