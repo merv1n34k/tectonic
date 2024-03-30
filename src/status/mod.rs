@@ -4,6 +4,7 @@
 //! Compatibility reexports of tectonic_status_base types
 
 pub mod termcolor;
+pub mod texpresso;
 
 pub use tectonic_status_base::{
     plain, ChatterLevel, MessageKind, NoopStatusBackend, StatusBackend,
