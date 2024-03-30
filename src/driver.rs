@@ -31,6 +31,7 @@ use std::{
 use tectonic_bridge_core::{CoreBridgeLauncher, DriverHooks, SecuritySettings, SystemRequestError};
 use tectonic_bundles::Bundle;
 use tectonic_engine_spx2html::AssetSpecification;
+use tectonic_engine_xetex::SyncTexConfig;
 use tectonic_io_base::{
     digest::DigestData,
     filesystem::{FilesystemIo, FilesystemPrimaryInputIo},
@@ -813,7 +814,7 @@ pub struct ProcessingSessionBuilder {
     bundle: Option<Box<dyn Bundle>>,
     keep_intermediates: bool,
     keep_logs: bool,
-    synctex: bool,
+    synctex: Option<SyncTexConfig>,
     build_date: Option<SystemTime>,
     unstables: UnstableOptions,
     shell_escape_mode: ShellEscapeMode,
@@ -973,7 +974,7 @@ impl ProcessingSessionBuilder {
     }
 
     /// If set to `true`, tex files will be compiled using synctex information.
-    pub fn synctex(&mut self, s: bool) -> &mut Self {
+    pub fn synctex(&mut self, s: Option<SyncTexConfig>) -> &mut Self {
         self.synctex = s;
         self
     }
@@ -1257,7 +1258,7 @@ impl ProcessingSessionBuilder {
             tex_rerun_specification: self.reruns,
             keep_intermediates: self.keep_intermediates,
             keep_logs: self.keep_logs,
-            synctex_enabled: self.synctex,
+            synctex: self.synctex,
             build_date: self.build_date.unwrap_or(SystemTime::UNIX_EPOCH),
             unstables: self.unstables,
             shell_escape_mode,
@@ -1321,7 +1322,7 @@ pub struct ProcessingSession {
     tex_rerun_specification: Option<usize>,
     keep_intermediates: bool,
     keep_logs: bool,
-    synctex_enabled: bool,
+    synctex: Option<SyncTexConfig>,
 
     /// See `TexEngine::with_date` and `XdvipdfmxEngine::with_date`.
     build_date: SystemTime,
@@ -1867,7 +1868,7 @@ impl ProcessingSession {
             TexEngine::default()
                 .halt_on_error_mode(!self.unstables.continue_on_errors)
                 .initex_mode(self.output_format == OutputFormat::Format)
-                .synctex(self.synctex_enabled)
+                .synctex(self.synctex)
                 .semantic_pagination(self.output_format == OutputFormat::Html)
                 .shell_escape(self.shell_escape_mode != ShellEscapeMode::Disabled)
                 .build_date(self.build_date)

@@ -11,6 +11,7 @@ use std::{
 };
 use structopt::StructOpt;
 use tectonic_bridge_core::{SecuritySettings, SecurityStance};
+use tectonic_engine_xetex::SyncTexConfig;
 
 use tectonic::{
     config::PersistentConfig,
@@ -112,13 +113,20 @@ impl CompileOptions {
             ProcessingSessionBuilder::new_with_security(SecuritySettings::new(stance));
         let format_path = self.format;
         let deterministic_mode = unstable.deterministic_mode;
+        
+        let synctex = if !self.synctex {
+            None
+        } else {
+            Some(SyncTexConfig{use_gz:true})
+        };
+
         sess_builder
             .unstables(unstable)
             .format_name(&format_path)
             .keep_logs(self.keep_logs)
             .keep_intermediates(self.keep_intermediates)
             .format_cache_path(config.format_cache_path()?)
-            .synctex(self.synctex);
+            .synctex(synctex);
 
         sess_builder.output_format(OutputFormat::from_str(&self.outfmt).unwrap());
 
