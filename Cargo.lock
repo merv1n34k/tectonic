@@ -2426,6 +2426,7 @@ version = "0.3.1"
 dependencies = [
  "flate2",
  "fs2",
+ "libc",
  "tectonic_errors",
  "tectonic_geturl",
  "tectonic_io_base",

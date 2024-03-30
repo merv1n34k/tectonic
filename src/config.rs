@@ -17,6 +17,7 @@ use std::{
 };
 use tectonic_bundles::{
     cache::Cache, dir::DirBundle, itar::IndexedTarBackend, zip::ZipBundle, Bundle,
+    texpresso::TexpressoBundle
 };
 use tectonic_io_base::app_dirs;
 use url::Url;
@@ -160,11 +161,14 @@ impl PersistentConfig {
         file_path: PathBuf,
         _status: &mut dyn StatusBackend,
     ) -> Result<Box<dyn Bundle>> {
-        let bundle: Box<dyn Bundle> = if file_path.is_dir() {
-            Box::new(DirBundle::new(file_path))
-        } else {
-            Box::new(ZipBundle::open(file_path)?)
-        };
+        let bundle: Box<dyn Bundle> =
+            if let Some(bundle) = TexpressoBundle::connect(file_path.to_str().unwrap()) {
+                Box::new(bundle)
+            } else if file_path.is_dir() {
+                Box::new(DirBundle::new(file_path))
+            } else {
+                Box::new(ZipBundle::open(file_path)?)
+            };
         Ok(bundle)
     }
 
