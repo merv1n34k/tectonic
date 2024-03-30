@@ -22,6 +22,7 @@ use tectonic::{
 use tectonic_bridge_core::{SecuritySettings, SecurityStance};
 use tectonic_bundles::Bundle;
 use tectonic_docmodel::workspace::{Workspace, WorkspaceCreator};
+use tectonic_io_base::{InputFeatures, OpenResult};
 use tectonic_errors::prelude::anyhow;
 use tectonic_status_base::plain::PlainStatusBackend;
 use tokio::runtime;
@@ -356,6 +357,10 @@ enum BundleCommands {
     #[structopt(name = "search")]
     /// Filter the list of filenames contained in the bundle
     Search(BundleSearchCommand),
+
+    #[structopt(name = "serve")]
+    /// Dump the contents of files requested on standard input
+    Serve(BundleServeCommand),
 }
 
 impl BundleCommand {
@@ -363,6 +368,7 @@ impl BundleCommand {
         match &self.command {
             BundleCommands::Cat(c) => c.customize(cc),
             BundleCommands::Search(c) => c.customize(cc),
+            BundleCommands::Serve(c) => c.customize(cc),
         }
     }
 
@@ -370,6 +376,7 @@ impl BundleCommand {
         match self.command {
             BundleCommands::Cat(c) => c.execute(config, status),
             BundleCommands::Search(c) => c.execute(config, status),
+            BundleCommands::Serve(c) => c.execute(config, status),
         }
     }
 }
@@ -465,6 +472,72 @@ impl BundleSearchCommand {
         }
 
         Ok(0)
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, StructOpt)]
+struct BundleServeCommand {
+    /// Use only resource files cached locally
+    #[structopt(short = "C", long)]
+    only_cached: bool,
+}
+
+impl BundleServeCommand {
+    fn customize(&self, cc: &mut CommandCustomizations) {
+        cc.always_stderr = true;
+    }
+
+    fn execute(self, config: PersistentConfig, status: &mut dyn StatusBackend) -> Result<i32> {
+        let mut bundle = get_a_bundle(config, self.only_cached, status)?;
+        let mut filename = String::new();
+        let stdin = std::io::stdin();
+        let mut stdout = std::io::stdout();
+        loop {
+            stdout.flush()?;
+            filename.clear();
+            match stdin.read_line(&mut filename) {
+                | Err(error) => {
+                    eprintln!("error: {error}");
+                    return Ok(1);
+                }
+                | Ok(0) => return Ok(0),
+                | Ok(_) => {
+                    let name = filename.trim_end();
+                    let error = match bundle.input_path(name, status) {
+                        OpenResult::Err(e) => e,
+                        OpenResult::Ok(path) => {
+                            let mut path = path.as_os_str().as_encoded_bytes();
+                            let size = path.len() as u64;
+                            stdout.write_all(&[b'P'])?;
+                            stdout.write_all(&size.to_le_bytes())?;
+                            let copied = std::io::copy(&mut path, &mut stdout)?;
+                            assert!(size == copied);
+                            continue
+                        },
+                        OpenResult::NotAvailable => {
+                            match bundle.input_open_name(name, status).must_exist() {
+                                Ok(mut t) => {
+                                    let size = t.get_size()? as u64;
+                                    stdout.write_all(&[b'C'])?;
+                                    stdout.write_all(&size.to_le_bytes())?;
+                                    let copied = std::io::copy(&mut t, &mut stdout)?;
+                                    assert!(size == copied);
+                                    continue
+                                }
+                                Err(e) => e
+                            }
+                        }
+                    };
+                    let text = error.to_string();
+                    let bytes = text.as_bytes();
+                    let size = bytes.len() as u64;
+                    stdout.write_all(&[b'E'])?;
+                    stdout.write_all(&size.to_le_bytes())?;
+                    stdout.write_all(&bytes)?;
+                }
+            };
+            stdout.flush().unwrap();
+        }
     }
 }
 
