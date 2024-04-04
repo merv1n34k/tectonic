@@ -119,6 +119,8 @@ impl CompileOptions {
 
         let synctex = if !self.synctex {
             None
+        } else if texpresso {
+            Some(SyncTexConfig{use_gz:false, texpresso_extension:true})
         } else {
             Some(SyncTexConfig{use_gz:true, texpresso_extension:false})
         };
