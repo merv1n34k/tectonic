@@ -10,10 +10,20 @@
 #define NO_EINTR(command) \
   do {} while ((command) == -1 && errno == EINTR)
 
-#define PASSERT(command) \
+#define STR(X) #X
+#define SSTR(X) STR(X)
+
+#define PERROR(result) \
+  if ((result) == -1)             \
+  {                           \
+    perror("texpresso_fork_with_channel failure (" __FILE__ ":" SSTR(__LINE__) ")"); \
+    abort();                  \
+  }
+
+#define PASSERT(command, ...) \
   if (!(command))             \
   {                           \
-    perror("texpresso_fork_with_channel failure: " #command); \
+  fprintf(stderr, "texpresso_fork_with_channel failure (" #command ") " __VA_ARGS__); \
     abort();                  \
   }
 
@@ -41,6 +51,7 @@ static void send_child_fd(int chan_fd, int32_t pid, uint32_t time, int child_fd)
   fds0[0] = child_fd;
 
   NO_EINTR(sent = sendmsg(chan_fd, &msg, 0));
+  PERROR(sent);
   PASSERT(sent == 12);
 }
 
@@ -57,16 +68,16 @@ int texpresso_fork_with_channel(int fd, uint32_t time)
   int sockets[2];
 
   // Create socket
-  PASSERT(socketpair(PF_UNIX, SOCK_STREAM, 0, sockets) == 0);
+  PERROR(socketpair(PF_UNIX, SOCK_STREAM, 0, sockets));
 
   // Fork
   pid_t child;
-  PASSERT((child = fork()) != -1);
+  PERROR((child = fork()));
 
   if (child == 0)
   {
     // In child: replace channel with new socket
-    PASSERT(dup2(sockets[1], fd) != -1);
+    PERROR(dup2(sockets[1], fd));
   }
   else
   {
@@ -77,12 +88,15 @@ int texpresso_fork_with_channel(int fd, uint32_t time)
     NO_EINTR(recvd = read(fd, answer, 4));
     PASSERT(recvd == 4 &&
             answer[0] == 'D' && answer[1] == 'O' &&
-            answer[2] == 'N' && answer[3] == 'E');
+            answer[2] == 'N' && answer[3] == 'E',
+            "recvd: %d, answer: %C%C%C%C",
+            recvd,
+            answer[0], answer[1], answer[2], answer[3]);
   }
-  PASSERT(close(sockets[0]) == 0);
+  PERROR(close(sockets[0]));
 
   // Release temporary socket
-  PASSERT(close(sockets[1]) == 0);
+  PERROR(close(sockets[1]));
 
   return child;
 }

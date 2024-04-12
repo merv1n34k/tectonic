@@ -142,13 +142,12 @@ impl IoProvider for TexpressoBundle {
                 OpenResult::Ok(input)
             },
             Answer::C(data) => {
-                eprintln!("[budnle] streaming resource {}", name);
+                eprintln!("[bundle] streaming resource {}", name);
                 let file = Cursor::new(data);
                 let origin = InputOrigin::Other;
                 let input = InputHandle::new_read_only(name, file, origin);
                 OpenResult::Ok(input)
             }
         }
-
     }
 }
