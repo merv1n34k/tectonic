@@ -85,7 +85,15 @@ int texpresso_fork_with_channel(int fd, uint32_t time)
     send_child_fd(fd, child, time, sockets[0]);
     char answer[4];
     int recvd;
-    NO_EINTR(recvd = read(fd, answer, 4));
+    do {
+      NO_EINTR(recvd = read(fd, answer, 4));
+
+      // Ignore any flush message, the buffers have been flushed
+      // anyway before starting the fork.
+    } while (recvd == 4 &&
+             answer[0] == 'F' && answer[1] == 'L' &&
+             answer[2] == 'S' && answer[3] == 'H');
+
     PASSERT(recvd == 4 &&
             answer[0] == 'D' && answer[1] == 'O' &&
             answer[2] == 'N' && answer[3] == 'E',
